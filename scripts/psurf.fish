@@ -2,10 +2,10 @@
 
 function psurf
     # TODO: set bin path here
-    set app_path "/home/bleart/code/tmp/pathsurfer/bin/pathsurfer"
+    set app_path "/home/bleart/code/pathsurfer/bin/pathsurfer"
     
     if not test -x "$app_path"
-        echo "error: pathsurfer not found or not executable at $app_path"
+        echo "error: pathsurfer not found or isn't executable at $app_path"
         return 1
     end
 
