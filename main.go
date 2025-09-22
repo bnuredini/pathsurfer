@@ -18,20 +18,34 @@ import (
 
 var (
 	writeDebugLogs  bool
+	logFile    		string
 	currentPath     string
 	files           []fs.DirEntry
 	selectedIdx     int
 	scrollOffset    int
 	screen          tcell.Screen
 	logger          *slog.Logger
-	logFile         *os.File
 	showHiddenFiles bool
 )
 
 func main() {
-	flag.BoolVar(&writeDebugLogs, "debug", false, "Write debug logs")
+	flag.BoolVar(
+		&writeDebugLogs,
+		"debug",
+		false,
+		"Set this to true to enable debug logs (set to false by default)",
+	)
+	flag.StringVar(
+		&logFile,
+		"log-file",
+		"pathsurfer.log",
+		"The path of the file used for storing logs",
+	)
+	flag.Parse()
 
-	logFile, err := os.OpenFile("pathsurfer.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	// TODO: Set an absolute path for the log file if no custom path was provided. The path should
+	// be determined during installation.
+	logFile, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatalf("Failed to open log file: %v", err)
 	}
@@ -225,8 +239,9 @@ func drawUI() {
 }
 
 func drawText(x1, y1, x2, y2 int, style tcell.Style, text string) {
-	currRow := y1
+	logger.Debug("Drawing text", "x1", x1, "y1", y1, "x2", x2, "y2", y2, "text", text)
 	currCol := x1
+	currRow := y1
 
 	for _, r := range text {
 		screen.SetContent(currCol, currRow, r, nil, style)
@@ -247,125 +262,65 @@ type keyHandlingResult struct {
 }
 
 func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
-	if ev.Key() == tcell.KeyRune {
-		switch ev.Rune() {
-		case 'q':
-			return keyHandlingResult{shouldQuit: true, newPath: currentPath}
-		case 'j':
-			if len(files) == 0 {
-				break
-			}
+	if ev.Key() != tcell.KeyRune {
+		return keyHandlingResult{shouldQuit: false, newPath: ""}
+	}
 
-			selectedIdx = (selectedIdx + 1) % len(files)
-
-			if screen == nil {
-				break
-			}
-
-			_, screenHeight := screen.Size()
-			visibleListHeight := max(screenHeight-2, 1)
-			if selectedIdx < scrollOffset {
-				scrollOffset = selectedIdx
-			} else if selectedIdx >= scrollOffset+visibleListHeight {
-				scrollOffset++ // NOTE: This has to be updated when for keybindings like 3j, for example.
-			}
-
-			maxPossibleScrollOffset := max(len(files)-visibleListHeight, 0)
-
-			if scrollOffset > maxPossibleScrollOffset {
-				scrollOffset = maxPossibleScrollOffset
-			}
-		case 'k':
-			if len(files) == 0 {
-				break
-			}
-
-			selectedIdx = (selectedIdx - 1 + len(files)) % len(files)
-
-			if screen == nil {
-				break
-			}
-
-			_, screenHeight := screen.Size()
-			visibleListHeight := max(screenHeight-2, 1)
-			if selectedIdx < scrollOffset {
-				scrollOffset = selectedIdx
-			} else if selectedIdx >= scrollOffset+visibleListHeight {
-				scrollOffset = selectedIdx - visibleListHeight + 1
-			}
-
-			maxPossibleScrollOffset := max(len(files)-visibleListHeight, 0)
-
-			if scrollOffset > maxPossibleScrollOffset {
-				scrollOffset = maxPossibleScrollOffset
-			}
-		case 'h':
-			parentDir := filepath.Dir(currentPath)
-			if parentDir != currentPath {
-				currentPath = parentDir
-				updateFileListings()
-			}
-		case 'l':
-			if len(files) > 0 && selectedIdx < len(files) && files[selectedIdx].IsDir() {
-				currentPath = filepath.Join(currentPath, files[selectedIdx].Name())
-				updateFileListings()
-			}
-		case '.':
-			showHiddenFiles = !showHiddenFiles
-			logger.Debug(fmt.Sprintf("Toggled showHiddenFiles to: %v.", showHiddenFiles))
-
-			var previouslySelectedFileName string
-			if len(files) > 0 && selectedIdx >= 0 && selectedIdx < len(files) {
-				previouslySelectedFileName = files[selectedIdx].Name()
-			}
-
-			updateFileListings()
-
-			newSelectedIdx := -1
-			if previouslySelectedFileName != "" {
-				for i, file := range files {
-					if file.Name() == previouslySelectedFileName {
-						newSelectedIdx = i
-						break
-					}
-				}
-			}
-
-			if newSelectedIdx != -1 {
-				selectedIdx = newSelectedIdx
-
-				if screen == nil {
-					break
-				}
-
-				_, screenHeight := screen.Size()
-				visibleListHeight := max(screenHeight-2, 1)
-				if selectedIdx < scrollOffset {
-					scrollOffset = selectedIdx
-				} else if selectedIdx >= scrollOffset+visibleListHeight {
-					scrollOffset = selectedIdx - visibleListHeight + 1
-				}
-
-				maxPossibleScrollOffset := max(len(files)-visibleListHeight, 0)
-
-				if scrollOffset > maxPossibleScrollOffset {
-					scrollOffset = maxPossibleScrollOffset
-				}
-				if scrollOffset < 0 {
-					scrollOffset = 0
-				}
-			}
-
-			logger.Debug(
-				"Handled '.' press",
-				"selectedIndex",
-				selectedIdx,
-				"scrollOffset",
-				scrollOffset,
-				"fileCount",
-				len(files),
-			)
+	switch ev.Rune() {
+	case 'q':
+		return keyHandlingResult{shouldQuit: true, newPath: currentPath}
+	case 'j':
+		if len(files) == 0 {
+			break
 		}
+
+		selectedIdx = (selectedIdx + 1) % len(files)
+
+		_, screenHeight := screen.Size()
+		visibleListHeight := max(screenHeight-2, 1)
+		if selectedIdx < scrollOffset {
+			scrollOffset = selectedIdx
+		} else if selectedIdx >= scrollOffset+visibleListHeight {
+			scrollOffset++ // NOTE: This has to be updated when for keybindings like 3j, for example.
+		}
+
+		maxPossibleScrollOffset := max(len(files)-visibleListHeight, 0)
+
+		if scrollOffset > maxPossibleScrollOffset {
+			scrollOffset = maxPossibleScrollOffset
+		}
+	case 'k':
+		if len(files) == 0 {
+			break
+		}
+
+		selectedIdx = (selectedIdx - 1 + len(files)) % len(files)
+
+		_, screenHeight := screen.Size()
+		visibleListHeight := max(screenHeight-2, 1)
+		if selectedIdx < scrollOffset {
+			scrollOffset = selectedIdx
+		} else if selectedIdx >= scrollOffset+visibleListHeight {
+			scrollOffset = selectedIdx - visibleListHeight + 1
+		}
+
+		maxPossibleScrollOffset := max(len(files)-visibleListHeight, 0)
+
+		if scrollOffset > maxPossibleScrollOffset {
+			scrollOffset = maxPossibleScrollOffset
+		}
+	case 'h':
+		parentDir := filepath.Dir(currentPath)
+		if parentDir != currentPath {
+			currentPath = parentDir
+			updateFileListings()
+		}
+	case 'l':
+		if len(files) > 0 && selectedIdx < len(files) && files[selectedIdx].IsDir() {
+			currentPath = filepath.Join(currentPath, files[selectedIdx].Name())
+			updateFileListings()
+		}
+	case '.':
 	}
 
 	return keyHandlingResult{shouldQuit: false, newPath: ""}
