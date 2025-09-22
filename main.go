@@ -128,7 +128,7 @@ func updateFileListings() {
 		selectedIdx = 0
 		scrollOffset = 0
 
-		return
+		return // TODO: Return an error here.
 	}
 
 	logger.Debug("Updating file list...", "rawFileCount", len(rawFiles), "path", currentPath)
@@ -140,59 +140,39 @@ func updateFileListings() {
 		files = []fs.DirEntry{}
 
 		for _, f := range rawFiles {
-			if !showHiddenFiles && strings.HasPrefix(f.Name(), ".") {
-				continue
+			if !strings.HasPrefix(f.Name(), ".") {
+				files = append(files, f)
 			}
-
-			files = append(files, f)
 		}
 	}
 
 	sort.Slice(files, func(i, j int) bool { return files[i].Name() < files[j].Name() })
 
-	// Adjust the current file marker if it's now out of bounds.
-	if selectedIdx >= len(files) {
-		if len(files) > 0 {
-			selectedIdx = len(files) - 1
-		} else {
-			selectedIdx = 0
-		}
-	}
+	// Adjust the current file marker if it's out of bounds.
 	if len(files) == 0 {
 		selectedIdx = 0
+	} else if selectedIdx >= len(files) {
+		selectedIdx = len(files) - 1
 	}
 
 	logger.Debug("Selected index after bounds check", "selectedIdx", selectedIdx)
 
 	// Adjust scrollOffset to ensure the selected index is visible.
-	visibleListHeight := 0
-	if screen != nil {
-		_, screenHeight := screen.Size()
-		visibleListHeight = max(screenHeight-2, 1)
-	} else {
-		visibleListHeight = 20 // TODO: Remove magic value.
-	}
+	_, screenHeight := screen.Size()
+	heightUsableForFileList := max(screenHeight-2, 1)
 
 	if selectedIdx < scrollOffset {
 		scrollOffset = selectedIdx
-	} else if selectedIdx >= scrollOffset+visibleListHeight {
-		scrollOffset = selectedIdx - visibleListHeight + 1
+	} else if selectedIdx >= scrollOffset+heightUsableForFileList {
+		// Since the file marker is at the bottom, the scroll marker should be
+		// (heightUsableForFileList - 1) rows behind the file marker.
+
+		scrollOffset = selectedIdx - (heightUsableForFileList-1)
 	}
 
-	maxPossibleScrollOffset := 0
-	if len(files) > 0 {
-		maxPossibleScrollOffset = max(len(files)-visibleListHeight, 0)
-	}
+	maxPossibleScrollOffset := max((len(files)-1) - heightUsableForFileList, 0)
+	scrollOffset = min(scrollOffset, maxPossibleScrollOffset)
 
-	if scrollOffset > maxPossibleScrollOffset {
-		scrollOffset = maxPossibleScrollOffset
-	}
-	if scrollOffset < 0 {
-		scrollOffset = 0
-	}
-	if len(files) == 0 {
-		scrollOffset = 0
-	}
 	logger.Debug(
 		"Finished updating the file listing", "selectedIndex", selectedIdx, "scrollOffset", scrollOffset,
 	)
@@ -203,7 +183,7 @@ func drawUI() {
 	w, h := screen.Size()
 
 	pathStyle := tcell.StyleDefault.Foreground(tcell.ColorBlue)
-	drawText(0, 0, w, 0, pathStyle, "Path: "+currentPath)
+	drawText(0, 0, w, 0, pathStyle, "Path: " + currentPath)
 
 	visibleListHeight := max(h-2, 0)
 
