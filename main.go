@@ -159,19 +159,8 @@ func updateFileListings() {
 
 	// Adjust scrollOffset to ensure the selected index is visible.
 	_, screenHeight := screen.Size()
-	heightUsableForFileList := max(screenHeight-2, 1)
-
-	if selectedIdx < scrollOffset {
-		scrollOffset = selectedIdx
-	} else if selectedIdx >= scrollOffset+heightUsableForFileList {
-		// Since the file marker is at the bottom, the scroll marker should be
-		// (heightUsableForFileList - 1) rows behind the file marker.
-
-		scrollOffset = selectedIdx - (heightUsableForFileList-1)
-	}
-
-	maxPossibleScrollOffset := max((len(files)-1) - heightUsableForFileList, 0)
-	scrollOffset = min(scrollOffset, maxPossibleScrollOffset)
+	heightUsableForFiles := max(screenHeight - 2, 1)
+	scrollOffset = adjustScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
 
 	logger.Debug(
 		"Finished updating the file listing", "selectedIndex", selectedIdx, "scrollOffset", scrollOffset,
@@ -182,19 +171,20 @@ func drawUI() {
 	screen.Clear()
 	w, h := screen.Size()
 
+	headerRowCount := 1
 	pathStyle := tcell.StyleDefault.Foreground(tcell.ColorBlue)
 	drawText(0, 0, w, 0, pathStyle, "Path: " + currentPath)
 
-	visibleListHeight := max(h-2, 0)
+	heightUsableForFiles := max(h-2, 0)
 
-	for i := 0; i < visibleListHeight; i++ {
-		fileIndexInFiles := scrollOffset + i
-		if fileIndexInFiles >= len(files) {
+	for i := 0; i < heightUsableForFiles; i++ {
+		fileIdx := scrollOffset + i
+		if fileIdx >= len(files) {
 			break
 		}
 
-		file := files[fileIndexInFiles]
-		rowToDrawOn := i + 1
+		file := files[fileIdx]
+		rowToDrawOn := i + headerRowCount
 
 		style := tcell.StyleDefault
 		prefix := "  "
@@ -203,7 +193,7 @@ func drawUI() {
 			style = style.Foreground(tcell.ColorGreen)
 			prefix = "📁 "
 		}
-		if fileIndexInFiles == selectedIdx {
+		if fileIdx == selectedIdx {
 			style = style.Background(tcell.ColorDarkGray).Foreground(tcell.ColorWhite)
 		}
 
@@ -255,40 +245,20 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 		}
 
 		selectedIdx = (selectedIdx + 1) % len(files)
-
 		_, screenHeight := screen.Size()
-		visibleListHeight := max(screenHeight-2, 1)
-		if selectedIdx < scrollOffset {
-			scrollOffset = selectedIdx
-		} else if selectedIdx >= scrollOffset+visibleListHeight {
-			scrollOffset++ // NOTE: This has to be updated when for keybindings like 3j, for example.
-		}
+		heightUsableForFiles := max(screenHeight - 2, 1)
 
-		maxPossibleScrollOffset := max(len(files)-visibleListHeight, 0)
-
-		if scrollOffset > maxPossibleScrollOffset {
-			scrollOffset = maxPossibleScrollOffset
-		}
+		scrollOffset = adjustScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
 	case 'k':
 		if len(files) == 0 {
 			break
 		}
 
 		selectedIdx = (selectedIdx - 1 + len(files)) % len(files)
-
 		_, screenHeight := screen.Size()
-		visibleListHeight := max(screenHeight-2, 1)
-		if selectedIdx < scrollOffset {
-			scrollOffset = selectedIdx
-		} else if selectedIdx >= scrollOffset+visibleListHeight {
-			scrollOffset = selectedIdx - visibleListHeight + 1
-		}
+		heightUsableForFiles := max(screenHeight - 2, 1)
 
-		maxPossibleScrollOffset := max(len(files)-visibleListHeight, 0)
-
-		if scrollOffset > maxPossibleScrollOffset {
-			scrollOffset = maxPossibleScrollOffset
-		}
+		scrollOffset = adjustScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
 	case 'h':
 		parentDir := filepath.Dir(currentPath)
 		if parentDir != currentPath {
@@ -296,7 +266,7 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 			updateFileListings()
 		}
 	case 'l':
-		if len(files) > 0 && selectedIdx < len(files) && files[selectedIdx].IsDir() {
+		if selectedIdx < len(files) && files[selectedIdx].IsDir() {
 			currentPath = filepath.Join(currentPath, files[selectedIdx].Name())
 			updateFileListings()
 		}
@@ -304,4 +274,19 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 	}
 
 	return keyHandlingResult{shouldQuit: false, newPath: ""}
+}
+
+func adjustScrollOffset(selectedIdx, currScrollOffset, heightUsableForFiles int) int {
+	if selectedIdx < currScrollOffset {
+		return selectedIdx
+	} else if selectedIdx >= currScrollOffset+heightUsableForFiles {
+		// Since the file marker is at the bottom, the scroll marker should be
+		// (heightUsableForFileList - 1) rows behind the file marker.
+
+		return selectedIdx - (heightUsableForFiles-1)
+	}
+
+	maxPossibleScrollOffset := max((len(files)-1) - heightUsableForFiles, 0)
+
+	return min(currScrollOffset, maxPossibleScrollOffset)
 }
