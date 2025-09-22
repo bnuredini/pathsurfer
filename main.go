@@ -19,13 +19,14 @@ import (
 var (
 	writeDebugLogs  bool
 	logFile    		string
+	showHiddenFiles bool
+
 	currentPath     string
 	files           []fs.DirEntry
 	selectedIdx     int
 	scrollOffset    int
 	screen          tcell.Screen
 	logger          *slog.Logger
-	showHiddenFiles bool
 )
 
 func main() {
@@ -33,7 +34,13 @@ func main() {
 		&writeDebugLogs,
 		"debug",
 		false,
-		"Set this to true to enable debug logs (set to false by default)",
+		"Determines whether debug logs are enabled (set to false by default)",
+	)
+	flag.BoolVar(
+		&showHiddenFiles,
+		"show-hidden-files",
+		false,
+		"Determines whether hidden files are shown (set to false by default)",
 	)
 	flag.StringVar(
 		&logFile,
@@ -123,6 +130,10 @@ MainLoop:
 func updateFileListings() {
 	rawFiles, err := os.ReadDir(currentPath)
 	if err != nil {
+		if os.IsPermission(err) {
+			logger.Error("Encountered a permissions issue when updating the file listing", "err", err)
+		}
+
 		logger.Error("Couldn't read directory", "currentPath", currentPath, "err", err)
 		files = []fs.DirEntry{}
 		selectedIdx = 0
@@ -236,6 +247,8 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 		return keyHandlingResult{shouldQuit: false, newPath: ""}
 	}
 
+	logger.Debug("Handling key press", "keyRune", ev.Rune(), "keyString", string(ev.Rune()))
+
 	switch ev.Rune() {
 	case 'q':
 		return keyHandlingResult{shouldQuit: true, newPath: currentPath}
@@ -271,6 +284,9 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 			updateFileListings()
 		}
 	case '.':
+		logger.Debug("Flipped toggle for hidden files", "showHiddenFiles", showHiddenFiles)
+		showHiddenFiles = !showHiddenFiles
+		updateFileListings()
 	}
 
 	return keyHandlingResult{shouldQuit: false, newPath: ""}
