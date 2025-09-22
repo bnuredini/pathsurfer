@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"io/fs"
-	"log"
+	"flag"
 	"os"
+	"log/slog"
+	"log"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -15,46 +17,60 @@ import (
 // TODO: Clean-up these global variables.
 
 var (
+	writeDebugLogs  bool
 	currentPath     string
 	files           []fs.DirEntry
 	selectedIdx     int
 	scrollOffset    int
 	screen          tcell.Screen
-	logger          *log.Logger
+	logger          *slog.Logger
 	logFile         *os.File
 	showHiddenFiles bool
 )
 
 func main() {
+	flag.BoolVar(&writeDebugLogs, "debug", false, "Write debug logs")
+
 	logFile, err := os.OpenFile("pathsurfer.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatalf("Failed to open log file: %v", err)
 	}
 
-	logger = log.New(logFile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
+	logHandlerOpts := &slog.HandlerOptions{}
+	if writeDebugLogs {
+		logHandlerOpts.Level = slog.LevelDebug
+	} else {
+		logHandlerOpts.Level = slog.LevelInfo
+	}
+
+	logHandler := slog.NewTextHandler(logFile, logHandlerOpts)
+	logger = slog.New(logHandler)
 	defer func() {
 		if logFile != nil {
-			logger.Println("Application shutting down. Closing log file...")
+			logger.Debug("Application shutting down. Closing log file...")
 
 			if closeErr := logFile.Close(); closeErr != nil {
-				log.Printf("Failed to close log file: %v", closeErr)
+				log.Fatalf("Failed to close log file: %v", closeErr)
 			}
 		}
 	}()
 
-	logger.Println("Starting...")
+	logger.Info("Starting...")
 
 	currentPath, err = os.Getwd()
 	if err != nil {
-		logger.Fatalf("Couldn't get current directory: %v", err)
+		logger.Info("Couldn't get current directory", "err", err)
+		os.Exit(1)
 	}
 
 	screen, err = tcell.NewScreen()
 	if err != nil {
-		logger.Fatalf("Couldn't create screen: %v", err)
+		logger.Error("Couldn't create screen", "err", err)
+		os.Exit(1)
 	}
 	if err := screen.Init(); err != nil {
-		logger.Fatalf("Couldn't initialize screen: %v", err)
+		logger.Error("Couldn't initialize screen", "err", err)
+		os.Exit(1)
 	}
 
 	screen.SetStyle(tcell.StyleDefault.Background(tcell.ColorReset).Foreground(tcell.ColorReset))
@@ -93,7 +109,7 @@ MainLoop:
 func updateFileListings() {
 	rawFiles, err := os.ReadDir(currentPath)
 	if err != nil {
-		logger.Printf("Couldn't read directory %s: %v!", currentPath, err)
+		logger.Debug("Couldn't read directory %s: %v!", currentPath, err)
 		files = []fs.DirEntry{}
 		selectedIdx = 0
 		scrollOffset = 0
@@ -101,10 +117,10 @@ func updateFileListings() {
 		return
 	}
 
-	logger.Printf("Updating file list... Raw file count: %d for path %s.", len(rawFiles), currentPath)
+	logger.Debug("Updating file list...", "rawFileCount", len(rawFiles), "path", currentPath)
 
 	if showHiddenFiles {
-		logger.Printf("Showing hidden files.")
+		logger.Debug("Showing hidden files.")
 		files = rawFiles
 	} else {
 		files = []fs.DirEntry{}
@@ -132,7 +148,7 @@ func updateFileListings() {
 		selectedIdx = 0
 	}
 
-	logger.Printf("Selected index after bounds check: %d", selectedIdx)
+	logger.Debug("Selected index after bounds check", "selectedIdx", selectedIdx)
 
 	// Adjust scrollOffset to ensure the selected index is visible.
 	visibleListHeight := 0
@@ -163,10 +179,8 @@ func updateFileListings() {
 	if len(files) == 0 {
 		scrollOffset = 0
 	}
-	logger.Printf(
-		"Finished updating the file listing. selectedIndex: %d, scrollOffset: %d",
-		selectedIdx,
-		scrollOffset,
+	logger.Debug(
+		"Finished updating the file listing", "selectedIndex", selectedIdx, "scrollOffset", scrollOffset,
 	)
 }
 
@@ -199,7 +213,7 @@ func drawUI() {
 			style = style.Background(tcell.ColorDarkGray).Foreground(tcell.ColorWhite)
 		}
 
-		logger.Printf("Drawing file %v at row %v", file.Name(), rowToDrawOn)
+		logger.Debug(fmt.Sprintf("Drawing file %v at row %v", file.Name(), rowToDrawOn))
 
 		drawText(0, rowToDrawOn, w, rowToDrawOn, style, prefix+file.Name())
 	}
@@ -298,7 +312,7 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 			}
 		case '.':
 			showHiddenFiles = !showHiddenFiles
-			logger.Printf("Toggled showHiddenFiles to: %v.", showHiddenFiles)
+			logger.Debug(fmt.Sprintf("Toggled showHiddenFiles to: %v.", showHiddenFiles))
 
 			var previouslySelectedFileName string
 			if len(files) > 0 && selectedIdx >= 0 && selectedIdx < len(files) {
@@ -342,10 +356,13 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 				}
 			}
 
-			logger.Printf(
-				"Handled '.' press. (selectedIndex=%d, scrollOffset=%d, fileCount=%d)",
+			logger.Debug(
+				"Handled '.' press",
+				"selectedIndex",
 				selectedIdx,
+				"scrollOffset",
 				scrollOffset,
+				"fileCount",
 				len(files),
 			)
 		}
