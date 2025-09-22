@@ -123,7 +123,7 @@ MainLoop:
 func updateFileListings() {
 	rawFiles, err := os.ReadDir(currentPath)
 	if err != nil {
-		logger.Debug("Couldn't read directory %s: %v!", currentPath, err)
+		logger.Error("Couldn't read directory", "currentPath", currentPath, "err", err)
 		files = []fs.DirEntry{}
 		selectedIdx = 0
 		scrollOffset = 0
