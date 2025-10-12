@@ -1,5 +1,5 @@
 binary_name = pathsurfer
-binary_path = .bin/${bin_name}
+binary_path = ./bin/${bin_name}
 main_package_path = .
 
 ## build: build the application
