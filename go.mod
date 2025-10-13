@@ -1,4 +1,4 @@
-module pathsurfer
+module github.com/bnuredini/pathsurfer
 
 go 1.21
 
