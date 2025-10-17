@@ -1,2 +1,5 @@
-* Running psruf on `/` results in this error: `<date> <time> FATAL: Failed to open log file: open pathsurfer.log: permission denied`.
 * Add support for fuzzy finding.
+* Write install script.
+* Add keybinding for opening pathsurfer.
+* Add support for vertical panes.
+* Add support for outputting selected files/directories.
