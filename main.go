@@ -1,33 +1,70 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/fs"
-	"flag"
-	"os"
-	"log/slog"
 	"log"
+	"log/slog"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
+
+)
+
+var (
+	buildTime string
+	version string
 )
 
 // TODO: Clean-up these global variables.
 
 var (
 	writeDebugLogs  bool
-	logFile    		string
+	logFile         string
 	showHiddenFiles bool
 
-	currentPath     string
-	files           []fs.DirEntry
-	selectedIdx     int
-	scrollOffset    int
-	screen          tcell.Screen
-	logger          *slog.Logger
+	currPath  string
+	files        []fs.DirEntry
+	selectedIdx  int
+	scrollOffset int
+	screen       tcell.Screen
+	logger       *slog.Logger
+
+	currMode        Mode
+	currSearchEntry string
 )
+
+type Mode int
+
+const (
+	ModeDefault Mode = iota
+	ModeSearch
+)
+
+const (
+	ProgramName = "pathsurfer"
+)
+
+var DefaultLogFilePath string
+
+func init() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal("Failed to access the user's home directory")
+	}
+
+	DefaultLogFilePath = filepath.Join(
+		home, 
+		".local", 
+		"share", 
+		ProgramName, 
+		fmt.Sprintf("%s.log", ProgramName),
+	)
+}
 
 func main() {
 	flag.BoolVar(
@@ -45,11 +82,23 @@ func main() {
 	flag.StringVar(
 		&logFile,
 		"log-file",
-		"pathsurfer.log",
+		DefaultLogFilePath,
 		"The path of the file used for storing logs",
 	)
 	flag.Parse()
 
+	logDir := filepath.Dir(logFile)
+	info, err := os.Stat(logDir)
+	if os.IsNotExist(err) {
+		if err = os.Mkdir(logDir, 0755); err != nil {
+			log.Printf("Failed to create %q for storing logs", logDir)
+		}
+	} else if err != nil {
+		log.Fatalf("Failed to use %q for storing logs: %v", info, err)
+	} else if !info.IsDir() {
+		log.Fatalf("Cannot store logs in %q because %[1]q is not a directory", logDir)
+	}
+	
 	// TODO: Set an absolute path for the log file if no custom path was provided. The path should
 	// be determined during installation.
 	logFile, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -76,9 +125,9 @@ func main() {
 		}
 	}()
 
-	logger.Info("Starting...")
+	logger.Info("Starting...", "buildTime", buildTime, "version", version)
 
-	currentPath, err = os.Getwd()
+	currPath, err = os.Getwd()
 	if err != nil {
 		logger.Info("Couldn't get current directory", "err", err)
 		os.Exit(1)
@@ -97,8 +146,11 @@ func main() {
 	screen.SetStyle(tcell.StyleDefault.Background(tcell.ColorReset).Foreground(tcell.ColorReset))
 	screen.Clear()
 
-	updateFileListings()
-	drawUI()
+	// TODO: Passing nil here doesn't immediately indicate that the function is suppose to read the
+	// current directory. Add another function for this case. Consider something like
+	// updateFileListingFromCurrDir.
+	updateFileListings(nil)
+	drawFileList()
 
 	finalPathToCd := ""
 
@@ -108,15 +160,13 @@ MainLoop:
 		switch ev := ev.(type) {
 		case *tcell.EventResize:
 			screen.Sync()
-			drawUI()
+			drawFileList()
 		case *tcell.EventKey:
 			result := handleKeyPress(ev)
 			if result.shouldQuit {
 				finalPathToCd = result.newPath
 				break MainLoop
 			}
-
-			drawUI()
 		}
 	}
 
@@ -127,22 +177,26 @@ MainLoop:
 	}
 }
 
-func updateFileListings() {
-	rawFiles, err := os.ReadDir(currentPath)
-	if err != nil {
-		if os.IsPermission(err) {
-			logger.Error("Encountered a permissions issue when updating the file listing", "err", err)
+func updateFileListings(rawFiles []fs.DirEntry) {
+	if len(rawFiles) == 0 {
+		fromCurrDir, err := os.ReadDir(currPath)
+		if err != nil {
+			if os.IsPermission(err) {
+				logger.Error("Encountered a permissions issue when updating the file listing", "err", err)
+			}
+
+			logger.Error("Couldn't read directory", "currentPath", currPath, "err", err)
+			files = []fs.DirEntry{}
+			selectedIdx = 0
+			scrollOffset = 0
+
+			return // TODO: Return an error here.
 		}
 
-		logger.Error("Couldn't read directory", "currentPath", currentPath, "err", err)
-		files = []fs.DirEntry{}
-		selectedIdx = 0
-		scrollOffset = 0
-
-		return // TODO: Return an error here.
+		rawFiles = fromCurrDir
 	}
 
-	logger.Debug("Updating file list...", "rawFileCount", len(rawFiles), "path", currentPath)
+	logger.Debug("Updating file list...", "rawFileCount", len(rawFiles), "path", currPath)
 
 	if showHiddenFiles {
 		logger.Debug("Showing hidden files.")
@@ -170,7 +224,7 @@ func updateFileListings() {
 
 	// Adjust scrollOffset to ensure the selected index is visible.
 	_, screenHeight := screen.Size()
-	heightUsableForFiles := max(screenHeight - 2, 1)
+	heightUsableForFiles := max(screenHeight-2, 1)
 	scrollOffset = adjustScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
 
 	logger.Debug(
@@ -178,13 +232,13 @@ func updateFileListings() {
 	)
 }
 
-func drawUI() {
+func drawFileList() {
 	screen.Clear()
 	w, h := screen.Size()
 
 	headerRowCount := 1
 	pathStyle := tcell.StyleDefault.Foreground(tcell.ColorBlue)
-	drawText(0, 0, w, 0, pathStyle, "Path: " + currentPath)
+	drawText(0, 0, w, 0, pathStyle, "Path: "+currPath)
 
 	heightUsableForFiles := max(h-2, 0)
 
@@ -219,6 +273,19 @@ func drawUI() {
 	screen.Show()
 }
 
+func drawSearch(searchEntry string) {
+	screen.Clear()
+	w, h := screen.Size()
+
+	pathStyle := tcell.StyleDefault.Foreground(tcell.ColorBlue)
+	drawText(0, 0, w, 0, pathStyle, "Path: "+currPath)
+
+	searchBarStyle := tcell.StyleDefault.Foreground(tcell.ColorYellow)
+	drawText(0, h-1, w, h-1, searchBarStyle, fmt.Sprintf("/%s", searchEntry))
+
+	screen.Show()
+}
+
 func drawText(x1, y1, x2, y2 int, style tcell.Style, text string) {
 	logger.Debug("Drawing text", "x1", x1, "y1", y1, "x2", x2, "y2", y2, "text", text)
 	currCol := x1
@@ -243,53 +310,89 @@ type keyHandlingResult struct {
 }
 
 func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
-	if ev.Key() != tcell.KeyRune {
-		return keyHandlingResult{shouldQuit: false, newPath: ""}
-	}
-
+	var result keyHandlingResult
 	logger.Debug("Handling key press", "keyRune", ev.Rune(), "keyString", string(ev.Rune()))
 
-	switch ev.Rune() {
-	case 'q':
-		return keyHandlingResult{shouldQuit: true, newPath: currentPath}
-	case 'j':
-		if len(files) == 0 {
-			break
+	if currMode == ModeDefault {
+		switch ev.Rune() {
+		case 'q':
+			return keyHandlingResult{shouldQuit: true, newPath: currPath}
+
+		case 'j':
+			if len(files) == 0 {
+				break
+			}
+
+			selectedIdx = (selectedIdx + 1) % len(files)
+			_, screenHeight := screen.Size()
+			heightUsableForFiles := max(screenHeight-2, 1)
+
+			scrollOffset = adjustScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
+
+		case 'k':
+			if len(files) == 0 {
+				break
+			}
+
+			selectedIdx = (selectedIdx - 1 + len(files)) % len(files)
+			_, screenHeight := screen.Size()
+			heightUsableForFiles := max(screenHeight-2, 1)
+
+			scrollOffset = adjustScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
+
+		case 'h':
+			parentDir := filepath.Dir(currPath)
+			if parentDir != currPath {
+				currPath = parentDir
+				updateFileListings(nil)
+			}
+
+		case 'l':
+			if selectedIdx < len(files) && files[selectedIdx].IsDir() {
+				currPath = filepath.Join(currPath, files[selectedIdx].Name())
+				updateFileListings(nil)
+			}
+
+		case '.':
+			logger.Debug("Flipped toggle for hidden files", "showHiddenFiles", showHiddenFiles)
+			showHiddenFiles = !showHiddenFiles
+			updateFileListings(nil)
+
+		case '/':
+			currMode = ModeSearch
+
+			// TODO: Don't remove the files when entering search mode. Files should be removed from
+			// the screen as they're being discarded by the fuzzy-finding algorithm in real time.
+			// (We use a separate goroutine for this.)
+
+			drawSearch("")
+			return result
 		}
 
-		selectedIdx = (selectedIdx + 1) % len(files)
-		_, screenHeight := screen.Size()
-		heightUsableForFiles := max(screenHeight - 2, 1)
-
-		scrollOffset = adjustScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
-	case 'k':
-		if len(files) == 0 {
-			break
-		}
-
-		selectedIdx = (selectedIdx - 1 + len(files)) % len(files)
-		_, screenHeight := screen.Size()
-		heightUsableForFiles := max(screenHeight - 2, 1)
-
-		scrollOffset = adjustScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
-	case 'h':
-		parentDir := filepath.Dir(currentPath)
-		if parentDir != currentPath {
-			currentPath = parentDir
-			updateFileListings()
-		}
-	case 'l':
-		if selectedIdx < len(files) && files[selectedIdx].IsDir() {
-			currentPath = filepath.Join(currentPath, files[selectedIdx].Name())
-			updateFileListings()
-		}
-	case '.':
-		logger.Debug("Flipped toggle for hidden files", "showHiddenFiles", showHiddenFiles)
-		showHiddenFiles = !showHiddenFiles
-		updateFileListings()
+		drawFileList()
 	}
 
-	return keyHandlingResult{shouldQuit: false, newPath: ""}
+	if currMode == ModeSearch {
+		switch ev.Key() {
+		case tcell.KeyCR:
+			currMode = ModeDefault
+
+			matches, _ := searchInDir(currPath, currSearchEntry)
+			// TODO: Handle the error from search.
+
+			updateFileListings(matches)
+			drawFileList()
+		case tcell.KeyESC:
+			// Disable search mode and ignore the current search string.
+			currMode = ModeDefault
+		case tcell.KeyRune:
+			currSearchEntry = currSearchEntry  + string(ev.Rune())
+
+			drawSearch(currSearchEntry)
+		}
+	}
+
+	return result
 }
 
 func adjustScrollOffset(selectedIdx, currScrollOffset, heightUsableForFiles int) int {
@@ -299,10 +402,34 @@ func adjustScrollOffset(selectedIdx, currScrollOffset, heightUsableForFiles int)
 		// Since the file marker is at the bottom, the scroll marker should be
 		// (heightUsableForFileList - 1) rows behind the file marker.
 
-		return selectedIdx - (heightUsableForFiles-1)
+		return selectedIdx - (heightUsableForFiles - 1)
 	}
 
-	maxPossibleScrollOffset := max((len(files)-1) - heightUsableForFiles, 0)
+	maxPossibleScrollOffset := max((len(files)-1)-heightUsableForFiles, 0)
 
 	return min(currScrollOffset, maxPossibleScrollOffset)
+}
+
+func searchInDir(path, pattern string) ([]fs.DirEntry, error) {
+	result := []fs.DirEntry{}
+
+	dirEntries, err := os.ReadDir(path)
+	if err != nil {
+		if os.IsPermission(err) {
+			logger.Error("Encountered a permissions issue whilst searching", "err", err)
+		} else {
+			logger.Error("Failed to get directory entires whilst searching", "err", err)
+		}
+
+		return nil, err
+	}
+
+	// TODO: Use a fuzzy-finding algorithm.
+	for _, dirEntry := range dirEntries {
+		if strings.Contains(dirEntry.Name(), pattern) {
+			result = append(result, dirEntry)
+		}
+	}
+
+	return result, nil
 }
