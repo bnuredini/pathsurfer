@@ -5,6 +5,7 @@ A tiny terminal utility for navigating through directiories more quickly.
 ## Screenshots
 
 ![screenshot1.png](./docs/imgs/screenshot1.png)
+![screenshot2.png](./docs/imgs/screenshot2.png)
 
 ## Installing
 
