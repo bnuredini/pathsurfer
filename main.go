@@ -427,6 +427,7 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 		case tcell.KeyCR:
 			currMode = ModeDefault
 			matches, _ := searchInDir(currPath, currSearchEntry)
+			currSearchEntry = ""
 			updateFileListings(matches) // TODO: Handle the error from search.
 
 		case tcell.KeyESC:
@@ -481,13 +482,14 @@ func render(keyChanges chan *tcell.EventKey) {
 	logger.Debug("Started listening for changes to the listing...")
 	for {
 		eventKey := <-keyChanges
+		keyRune := eventKey.Rune()
 		key := eventKey.Key()
 
-		logger.Debug("listenForListingChanges: processing...", "key", key)
+		logger.Debug("render: processing...", "keyRune", eventKey.Rune(), "keyString", string(eventKey.Rune()), "currMode", currMode, "selectedIdx", selectedIdx)
 
 		switch currMode {
 		case ModeDefault:
-			if key == 'h' || key == 'j' || key == 'k' || key == 'l' || key == tcell.KeyCR {
+			if keyRune == 'h' || keyRune == 'j' || keyRune == 'k' || keyRune == 'l' || key == tcell.KeyCR {
 				drawFileList()
 				drawInfoLine()
 				screen.Show()
