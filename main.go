@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
-
 )
 
 var (
@@ -27,7 +26,7 @@ var (
 	logFile         string
 	showHiddenFiles bool
 
-	currPath  string
+	currPath  	 string
 	files        []fs.DirEntry
 	selectedIdx  int
 	scrollOffset int
@@ -36,6 +35,11 @@ var (
 
 	currMode        Mode
 	currSearchEntry string
+
+	// Keeps track of which position the cursor / selected row was on last time for a given
+	// directory. This improves the experience of navigation by allowing the user to quickly go back
+	// to the original path after they've changed directories multiple times.
+	positionHistory map[string]int
 )
 
 type Mode int
@@ -58,15 +62,18 @@ func init() {
 	}
 
 	DefaultLogFilePath = filepath.Join(
-		home, 
-		".local", 
-		"share", 
-		ProgramName, 
+		home,
+		".local",
+		"share",
+		ProgramName,
 		fmt.Sprintf("%s.log", ProgramName),
 	)
+
+	positionHistory = make(map[string]int)
 }
 
 func main() {
+	// TOOD: Move these to config.go and add support for priting the config.
 	flag.BoolVar(
 		&writeDebugLogs,
 		"debug",
@@ -88,19 +95,18 @@ func main() {
 	flag.Parse()
 
 	logDir := filepath.Dir(logFile)
-	info, err := os.Stat(logDir)
+	logDirInfo, err := os.Stat(logDir)
 	if os.IsNotExist(err) {
-		if err = os.Mkdir(logDir, 0755); err != nil {
+		err = os.Mkdir(logDir, 0755)
+		if err != nil {
 			log.Printf("Failed to create %q for storing logs", logDir)
 		}
 	} else if err != nil {
-		log.Fatalf("Failed to use %q for storing logs: %v", info, err)
-	} else if !info.IsDir() {
+		log.Fatalf("Failed to use %q for storing logs: %v", logDirInfo, err)
+	} else if !logDirInfo.IsDir() {
 		log.Fatalf("Cannot store logs in %q because %[1]q is not a directory", logDir)
 	}
-	
-	// TODO: Set an absolute path for the log file if no custom path was provided. The path should
-	// be determined during installation.
+
 	logFile, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatalf("Failed to open log file: %v", err)
@@ -115,7 +121,12 @@ func main() {
 
 	logHandler := slog.NewTextHandler(logFile, logHandlerOpts)
 	logger = slog.New(logHandler)
+
 	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("application panicked", "panic", r)
+		}
+
 		if logFile != nil {
 			logger.Debug("Application shutting down. Closing log file...")
 
@@ -154,6 +165,10 @@ func main() {
 
 	finalPathToCd := ""
 
+	keyEntered := make(chan *tcell.EventKey)
+
+	go render(keyEntered)
+
 MainLoop:
 	for {
 		ev := screen.PollEvent()
@@ -167,6 +182,9 @@ MainLoop:
 				finalPathToCd = result.newPath
 				break MainLoop
 			}
+
+			logger.Debug("MainLoop > key pressed case")
+			keyEntered <- ev
 		}
 	}
 
@@ -238,7 +256,7 @@ func drawFileList() {
 
 	headerRowCount := 1
 	pathStyle := tcell.StyleDefault.Foreground(tcell.ColorBlue)
-	drawText(0, 0, w, 0, pathStyle, "Path: "+currPath)
+	drawText(0, 0, w, 0, pathStyle, fmt.Sprintf("Path: %s", currPath))
 
 	heightUsableForFiles := max(h-2, 0)
 
@@ -266,11 +284,18 @@ func drawFileList() {
 
 		drawText(0, rowToDrawOn, w, rowToDrawOn, style, prefix+file.Name())
 	}
+}
 
+func drawInfoLine() {
+	w, h := screen.Size()
 	helpStyle := tcell.StyleDefault.Foreground(tcell.ColorYellow)
 	drawText(0, h-1, w, h-1, helpStyle, "(j/k: up/down) (l: enter) (h: parent) (. hidden) (q: quit)")
+}
 
-	screen.Show()
+func drawSearchLine(searchEntry string) {
+	w, h := screen.Size()
+	searchBarStyle := tcell.StyleDefault.Foreground(tcell.ColorYellow)
+	drawText(0, h-1, w, h-1, searchBarStyle, fmt.Sprintf("/%s", searchEntry))
 }
 
 func drawSearch(searchEntry string) {
@@ -278,7 +303,7 @@ func drawSearch(searchEntry string) {
 	w, h := screen.Size()
 
 	pathStyle := tcell.StyleDefault.Foreground(tcell.ColorBlue)
-	drawText(0, 0, w, 0, pathStyle, "Path: "+currPath)
+	drawText(0, 0, w, 0, pathStyle, fmt.Sprintf("Path: %s", currPath))
 
 	searchBarStyle := tcell.StyleDefault.Foreground(tcell.ColorYellow)
 	drawText(0, h-1, w, h-1, searchBarStyle, fmt.Sprintf("/%s", searchEntry))
@@ -341,54 +366,72 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 			scrollOffset = adjustScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
 
 		case 'h':
-			parentDir := filepath.Dir(currPath)
-			if parentDir != currPath {
-				currPath = parentDir
+			logger.Debug("Updating position history...", "path", currPath, "idx", selectedIdx)
+			positionHistory[currPath] = selectedIdx
+
+			oldPath := currPath
+			newPath := filepath.Dir(currPath)
+			currPath = newPath
+
+			idxFromHistory, ok := positionHistory[newPath]
+			if !ok {
 				updateFileListings(nil)
+
+				for i, f := range files {
+					if f.Name() == filepath.Base(oldPath) {
+						selectedIdx = i
+					}
+				}
+			} else {
+				updateFileListings(nil)
+				selectedIdx = idxFromHistory
 			}
 
 		case 'l':
 			if selectedIdx < len(files) && files[selectedIdx].IsDir() {
+				positionHistory[currPath] = selectedIdx
+
 				currPath = filepath.Join(currPath, files[selectedIdx].Name())
 				updateFileListings(nil)
+
+				if idxFromHistory, ok := positionHistory[currPath]; ok {
+					selectedIdx = idxFromHistory
+				} else {
+					selectedIdx = 0
+				}
 			}
 
 		case '.':
-			logger.Debug("Flipped toggle for hidden files", "showHiddenFiles", showHiddenFiles)
 			showHiddenFiles = !showHiddenFiles
 			updateFileListings(nil)
 
 		case '/':
 			currMode = ModeSearch
-
-			// TODO: Don't remove the files when entering search mode. Files should be removed from
-			// the screen as they're being discarded by the fuzzy-finding algorithm in real time.
-			// (We use a separate goroutine for this.)
-
-			drawSearch("")
 			return result
 		}
-
-		drawFileList()
 	}
 
 	if currMode == ModeSearch {
 		switch ev.Key() {
+		case tcell.KeyRune:
+			currSearchEntry = currSearchEntry + string(ev.Rune())
+			matches, _ := searchInDir(currPath, currSearchEntry)
+			updateFileListings(matches)
+
+		case tcell.KeyBackspace, 127:
+			logger.Debug("Processing a backspace...", "currSearchEntry", currSearchEntry, "newSearchEntry", currSearchEntry[:len(currSearchEntry) - 1])
+			currSearchEntry = currSearchEntry[:len(currSearchEntry) - 1]
+			matches, _ := searchInDir(currPath, currSearchEntry)
+			updateFileListings(matches)
+
 		case tcell.KeyCR:
 			currMode = ModeDefault
-
 			matches, _ := searchInDir(currPath, currSearchEntry)
-			// TODO: Handle the error from search.
+			updateFileListings(matches) // TODO: Handle the error from search.
 
-			updateFileListings(matches)
-			drawFileList()
 		case tcell.KeyESC:
 			// Disable search mode and ignore the current search string.
 			currMode = ModeDefault
-		case tcell.KeyRune:
-			currSearchEntry = currSearchEntry  + string(ev.Rune())
-
-			drawSearch(currSearchEntry)
 		}
 	}
 
@@ -432,4 +475,28 @@ func searchInDir(path, pattern string) ([]fs.DirEntry, error) {
 	}
 
 	return result, nil
+}
+
+func render(keyChanges chan *tcell.EventKey) {
+	logger.Debug("Started listening for changes to the listing...")
+	for {
+		eventKey := <-keyChanges
+		key := eventKey.Key()
+
+		logger.Debug("listenForListingChanges: processing...", "key", key)
+
+		switch currMode {
+		case ModeDefault:
+			if key == 'h' || key == 'j' || key == 'k' || key == 'l' || key == tcell.KeyCR {
+				drawFileList()
+				drawInfoLine()
+				screen.Show()
+			}
+
+		case ModeSearch:
+			drawFileList()
+			drawSearchLine(currSearchEntry)
+			screen.Show()
+		}
+	}
 }
