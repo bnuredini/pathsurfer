@@ -5,7 +5,6 @@ A tiny terminal utility for navigating through directiories more quickly.
 ## Screenshots
 
 ![screenshot1.png](./docs/imgs/screenshot1.png)
-![screenshot2.png](./docs/imgs/screenshot2.png)
 
 ## Installing
 
@@ -28,7 +27,8 @@ sudo make install
 
 The binary should be installed at `/usr/bin/pathsurfer`.
 
-Finally, make sure add the `psurf` function to your shell.
+Finally, make sure add the `psurf` function to your shell. Depending on which shell you're using,
+you should run one of the following commands:
 
 ```
 make install/fish
@@ -39,6 +39,9 @@ make install/bash
 ```
 
 #### Using the `go` toolchain
+
+If you don't have `make` installed in your system, you can build this project by using the Go
+toolchain directly.
 
 Clone the repository:
 
@@ -68,4 +71,4 @@ install -m 644 <path-to-pathsurfer>/scripts/psurf.fish ~/.config/fish/conf.d/psu
 
 ## License
 
-MIT. See the [LICENSE](./LICENSE) file.
+Licensed under MIT. See the [LICENSE](./LICENSE) file for more information.
