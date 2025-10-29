@@ -60,13 +60,13 @@ install -m 644 ./bin/pathsurfer /usr/bin/pathsurfer
 To include the `psurf.sh` script into your Bash installation, make sure to add this line your `.bashrc`:
 
 ```
-source <path-to-pathsurfer>/scripts/psurf.sh
+source <path-to-repo>/scripts/psurf.sh
 ```
 
 To include the `psurf.fish` script into your Fish installation, run:
 
 ```
-install -m 644 <path-to-pathsurfer>/scripts/psurf.fish ~/.config/fish/conf.d/psurf.fish
+install -m 644 <path-to-repo>/scripts/psurf.fish ~/.config/fish/conf.d/psurf.fish
 ```
 
 ## License
