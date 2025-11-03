@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
+
+	"github.com/bnuredini/pathsurfer/fuzzy"
 )
 
 var (
@@ -23,22 +25,25 @@ var (
 
 var (
 	writeDebugLogs  bool
-	logFile         string
+	logFilePath     string
 	showHiddenFiles bool
 
-	currPath  	 string
-	files        []fs.DirEntry
-	selectedIdx  int
-	scrollOffset int
 	screen       tcell.Screen
 	logger       *slog.Logger
 
+	currPath  	 string
 	currMode        Mode
 	currSearchEntry string
-
-	// Keeps track of which position the cursor / selected row was on last time for a given
-	// directory. This improves the experience of navigation by allowing the user to quickly go back
-	// to the original path after they've changed directories multiple times.
+	files        []fs.DirEntry
+	selectedIdx  int
+	// Used when the number of files is higher than what can fit on the screen.
+	// This value indicates how many lines/rows have been scrolled past by the
+	// user.
+	scrollOffset int
+	// Keeps track of which position the cursor / selected row was on last time
+	// for a given directory. This improves the experience of navigation by
+	// allowing the user to quickly go back to the original path after they've
+	// changed directories multiple times.
 	positionHistory map[string]int
 )
 
@@ -87,14 +92,14 @@ func main() {
 		"Determines whether hidden files are shown (set to false by default)",
 	)
 	flag.StringVar(
-		&logFile,
+		&logFilePath,
 		"log-file",
 		DefaultLogFilePath,
 		"The path of the file used for storing logs",
 	)
 	flag.Parse()
 
-	logDir := filepath.Dir(logFile)
+	logDir := filepath.Dir(logFilePath)
 	logDirInfo, err := os.Stat(logDir)
 	if os.IsNotExist(err) {
 		err = os.Mkdir(logDir, 0755)
@@ -107,7 +112,7 @@ func main() {
 		log.Fatalf("Cannot store logs in %q because %[1]q is not a directory", logDir)
 	}
 
-	logFile, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatalf("Failed to open log file: %v", err)
 	}
@@ -157,14 +162,13 @@ func main() {
 	screen.SetStyle(tcell.StyleDefault.Background(tcell.ColorReset).Foreground(tcell.ColorReset))
 	screen.Clear()
 
-	// TODO: Passing nil here doesn't immediately indicate that the function is suppose to read the
-	// current directory. Add another function for this case. Consider something like
-	// updateFileListingFromCurrDir.
+	// TODO: Passing nil here doesn't immediately indicate that the function is
+	// suppose to read the current directory. Add another function for this
+	// case. Consider something like updateFileListingFromCurrDir.
 	updateFileListings(nil)
 	drawFileList()
 
 	finalPathToCd := ""
-
 	keyEntered := make(chan *tcell.EventKey)
 
 	go render(keyEntered)
@@ -176,6 +180,7 @@ MainLoop:
 		case *tcell.EventResize:
 			screen.Sync()
 			drawFileList()
+
 		case *tcell.EventKey:
 			result := handleKeyPress(ev)
 			if result.shouldQuit {
@@ -203,7 +208,7 @@ func updateFileListings(rawFiles []fs.DirEntry) {
 				logger.Error("Encountered a permissions issue when updating the file listing", "err", err)
 			}
 
-			logger.Error("Couldn't read directory", "currentPath", currPath, "err", err)
+			logger.Error("Couldn't read directory", "currPath", currPath, "err", err)
 			files = []fs.DirEntry{}
 			selectedIdx = 0
 			scrollOffset = 0
@@ -243,7 +248,7 @@ func updateFileListings(rawFiles []fs.DirEntry) {
 	// Adjust scrollOffset to ensure the selected index is visible.
 	_, screenHeight := screen.Size()
 	heightUsableForFiles := max(screenHeight-2, 1)
-	scrollOffset = adjustScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
+	scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
 
 	logger.Debug(
 		"Finished updating the file listing", "selectedIndex", selectedIdx, "scrollOffset", scrollOffset,
@@ -352,7 +357,7 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 			_, screenHeight := screen.Size()
 			heightUsableForFiles := max(screenHeight-2, 1)
 
-			scrollOffset = adjustScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
+			scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
 
 		case 'k':
 			if len(files) == 0 {
@@ -363,7 +368,7 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 			_, screenHeight := screen.Size()
 			heightUsableForFiles := max(screenHeight-2, 1)
 
-			scrollOffset = adjustScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
+			scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
 
 		case 'h':
 			logger.Debug("Updating position history...", "path", currPath, "idx", selectedIdx)
@@ -415,18 +420,19 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 		switch ev.Key() {
 		case tcell.KeyRune:
 			currSearchEntry = currSearchEntry + string(ev.Rune())
-			matches, _ := searchInDir(currPath, currSearchEntry)
+			matches, _ := searchInDir(currSearchEntry, files)
+			logger.Debug("Finished searching", "matches", matches)
 			updateFileListings(matches)
 
 		case tcell.KeyBackspace, 127:
 			logger.Debug("Processing a backspace...", "currSearchEntry", currSearchEntry, "newSearchEntry", currSearchEntry[:len(currSearchEntry) - 1])
 			currSearchEntry = currSearchEntry[:len(currSearchEntry) - 1]
-			matches, _ := searchInDir(currPath, currSearchEntry)
+			matches, _ := searchInDir(currSearchEntry, files)
 			updateFileListings(matches)
 
 		case tcell.KeyCR:
 			currMode = ModeDefault
-			matches, _ := searchInDir(currPath, currSearchEntry)
+			matches, _ := searchInDir(currSearchEntry, files)
 			currSearchEntry = ""
 			updateFileListings(matches) // TODO: Handle the error from search.
 
@@ -439,13 +445,12 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 	return result
 }
 
-func adjustScrollOffset(selectedIdx, currScrollOffset, heightUsableForFiles int) int {
+func calculateScrollOffset(selectedIdx, currScrollOffset, heightUsableForFiles int) int {
 	if selectedIdx < currScrollOffset {
 		return selectedIdx
 	} else if selectedIdx >= currScrollOffset+heightUsableForFiles {
 		// Since the file marker is at the bottom, the scroll marker should be
 		// (heightUsableForFileList - 1) rows behind the file marker.
-
 		return selectedIdx - (heightUsableForFiles - 1)
 	}
 
@@ -454,23 +459,23 @@ func adjustScrollOffset(selectedIdx, currScrollOffset, heightUsableForFiles int)
 	return min(currScrollOffset, maxPossibleScrollOffset)
 }
 
-func searchInDir(path, pattern string) ([]fs.DirEntry, error) {
+func searchInDir(pattern string, candidateFiles []fs.DirEntry) ([]fs.DirEntry, error) {
+	if len(candidateFiles) == 0 {
+		return []fs.DirEntry{}, nil
+	}
+	// PERF: Use better / custom data structures to avoid these transformations.
 	result := []fs.DirEntry{}
+	candidates := []string{}
+	candidatesMap := make(map[string]fs.DirEntry)
 
-	dirEntries, err := os.ReadDir(path)
-	if err != nil {
-		if os.IsPermission(err) {
-			logger.Error("Encountered a permissions issue whilst searching", "err", err)
-		} else {
-			logger.Error("Failed to get directory entires whilst searching", "err", err)
-		}
-
-		return nil, err
+	for _, f := range candidateFiles {
+		candidates = append(candidates, f.Name())
+		candidatesMap[f.Name()] = f
 	}
 
-	// TODO: Use a fuzzy-finding algorithm.
-	for _, dirEntry := range dirEntries {
-		if strings.Contains(dirEntry.Name(), pattern) {
+	matches := fuzzy.Find(pattern, candidates)
+	for _, match := range matches {
+		if dirEntry, ok := candidatesMap[match.CandidateString]; ok {
 			result = append(result, dirEntry)
 		}
 	}
