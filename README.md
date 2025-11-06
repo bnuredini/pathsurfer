@@ -71,4 +71,5 @@ install -m 644 <path-to-repo>/scripts/psurf.fish ~/.config/fish/conf.d/psurf.fis
 
 ## License
 
-Licensed under MIT. See the [LICENSE](./LICENSE) file for more information.
+This project is released under the MIT license. See the [LICENSE](./LICENSE) file for more 
+information.
