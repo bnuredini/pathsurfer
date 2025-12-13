@@ -18,7 +18,7 @@ import (
 
 var (
 	buildTime string
-	version string
+	version   string
 )
 
 // TODO: Clean-up these global variables.
@@ -28,14 +28,14 @@ var (
 	logFilePath     string
 	showHiddenFiles bool
 
-	screen       tcell.Screen
-	logger       *slog.Logger
+	screen tcell.Screen
+	logger *slog.Logger
 
-	currPath  	 string
+	currPath        string
 	currMode        Mode
 	currSearchEntry string
-	files        []fs.DirEntry
-	selectedIdx  int
+	files           []fs.DirEntry
+	selectedIdx     int
 	// Used when the number of files is higher than what can fit on the screen.
 	// This value indicates how many lines/rows have been scrolled past by the
 	// user.
@@ -99,6 +99,21 @@ func main() {
 	)
 	flag.Parse()
 
+	if len(os.Args) > 1 {
+		pathArg := strings.TrimSpace(os.Args[1])
+
+		pathDirInfo, err := os.Stat(pathArg)
+		if os.IsNotExist(err) {
+			log.Fatalf("%q does not exist", pathArg)
+		} else if err != nil {
+			log.Fatalf("%q is not a valid path: %v", pathArg, err)
+		} else if !pathDirInfo.IsDir() {
+			log.Fatalf("%q is not a valid directory", pathArg)
+		}
+
+		currPath = pathArg
+	}
+
 	logDir := filepath.Dir(logFilePath)
 	logDirInfo, err := os.Stat(logDir)
 	if os.IsNotExist(err) {
@@ -143,10 +158,12 @@ func main() {
 
 	logger.Info("Starting...", "buildTime", buildTime, "version", version)
 
-	currPath, err = os.Getwd()
-	if err != nil {
-		logger.Info("Couldn't get current directory", "err", err)
-		os.Exit(1)
+	if strings.TrimSpace(currPath) == "" {
+		currPath, err = os.Getwd()
+		if err != nil {
+			logger.Info("Couldn't get current directory", "err", err)
+			os.Exit(1)
+		}
 	}
 
 	screen, err = tcell.NewScreen()
@@ -162,11 +179,8 @@ func main() {
 	screen.SetStyle(tcell.StyleDefault.Background(tcell.ColorReset).Foreground(tcell.ColorReset))
 	screen.Clear()
 
-	// TODO: Passing nil here doesn't immediately indicate that the function is
-	// suppose to read the current directory. Add another function for this
-	// case. Consider something like updateFileListingFromCurrDir.
-	updateFileListings(nil)
-	drawFileList()
+	updateFileListingsUsingPath(currPath)
+	drawFileList(screen)
 
 	finalPathToCd := ""
 	keyEntered := make(chan *tcell.EventKey)
@@ -179,7 +193,7 @@ MainLoop:
 		switch ev := ev.(type) {
 		case *tcell.EventResize:
 			screen.Sync()
-			drawFileList()
+			drawFileList(screen)
 
 		case *tcell.EventKey:
 			result := handleKeyPress(ev)
@@ -188,7 +202,6 @@ MainLoop:
 				break MainLoop
 			}
 
-			logger.Debug("MainLoop > key pressed case")
 			keyEntered <- ev
 		}
 	}
@@ -201,24 +214,6 @@ MainLoop:
 }
 
 func updateFileListings(rawFiles []fs.DirEntry) {
-	if len(rawFiles) == 0 {
-		fromCurrDir, err := os.ReadDir(currPath)
-		if err != nil {
-			if os.IsPermission(err) {
-				logger.Error("Encountered a permissions issue when updating the file listing", "err", err)
-			}
-
-			logger.Error("Couldn't read directory", "currPath", currPath, "err", err)
-			files = []fs.DirEntry{}
-			selectedIdx = 0
-			scrollOffset = 0
-
-			return // TODO: Return an error here.
-		}
-
-		rawFiles = fromCurrDir
-	}
-
 	logger.Debug("Updating file list...", "rawFileCount", len(rawFiles), "path", currPath)
 
 	if showHiddenFiles {
@@ -234,7 +229,9 @@ func updateFileListings(rawFiles []fs.DirEntry) {
 		}
 	}
 
-	sort.Slice(files, func(i, j int) bool { return files[i].Name() < files[j].Name() })
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].Name() < files[j].Name()
+	})
 
 	// Adjust the current file marker if it's out of bounds.
 	if len(files) == 0 {
@@ -255,7 +252,25 @@ func updateFileListings(rawFiles []fs.DirEntry) {
 	)
 }
 
-func drawFileList() {
+func updateFileListingsUsingPath(path string) {
+	dir, err := os.ReadDir(path)
+	if err != nil {
+		if os.IsPermission(err) {
+			logger.Error("Encountered a permissions issue when updating the file listing", "err", err)
+		}
+
+		logger.Error("Couldn't read directory", "currPath", currPath, "err", err)
+		files = []fs.DirEntry{}
+		selectedIdx = 0
+		scrollOffset = 0
+
+		return // TODO: Return an error here.
+	}
+
+	updateFileListings(dir)
+}
+
+func drawFileList(screen tcell.Screen) {
 	screen.Clear()
 	w, h := screen.Size()
 
@@ -303,17 +318,12 @@ func drawSearchLine(searchEntry string) {
 	drawText(0, h-1, w, h-1, searchBarStyle, fmt.Sprintf("/%s", searchEntry))
 }
 
-func drawSearch(searchEntry string) {
+func drawSearchList(searchEntry string) {
 	screen.Clear()
-	w, h := screen.Size()
+	w, _ := screen.Size()
 
 	pathStyle := tcell.StyleDefault.Foreground(tcell.ColorBlue)
 	drawText(0, 0, w, 0, pathStyle, fmt.Sprintf("Path: %s", currPath))
-
-	searchBarStyle := tcell.StyleDefault.Foreground(tcell.ColorYellow)
-	drawText(0, h-1, w, h-1, searchBarStyle, fmt.Sprintf("/%s", searchEntry))
-
-	screen.Show()
 }
 
 func drawText(x1, y1, x2, y2 int, style tcell.Style, text string) {
@@ -343,7 +353,7 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 	var result keyHandlingResult
 	logger.Debug("Handling key press", "keyRune", ev.Rune(), "keyString", string(ev.Rune()))
 
-	if currMode == ModeDefault {
+	if currMode == ModeDefault && ev.Key() == tcell.KeyRune {
 		switch ev.Rune() {
 		case 'q':
 			return keyHandlingResult{shouldQuit: true, newPath: currPath}
@@ -380,7 +390,7 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 
 			idxFromHistory, ok := positionHistory[newPath]
 			if !ok {
-				updateFileListings(nil)
+				updateFileListingsUsingPath(currPath)
 
 				for i, f := range files {
 					if f.Name() == filepath.Base(oldPath) {
@@ -388,7 +398,7 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 					}
 				}
 			} else {
-				updateFileListings(nil)
+				updateFileListingsUsingPath(currPath)
 				selectedIdx = idxFromHistory
 			}
 
@@ -397,7 +407,7 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 				positionHistory[currPath] = selectedIdx
 
 				currPath = filepath.Join(currPath, files[selectedIdx].Name())
-				updateFileListings(nil)
+				updateFileListingsUsingPath(currPath)
 
 				if idxFromHistory, ok := positionHistory[currPath]; ok {
 					selectedIdx = idxFromHistory
@@ -408,7 +418,7 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 
 		case '.':
 			showHiddenFiles = !showHiddenFiles
-			updateFileListings(nil)
+			updateFileListingsUsingPath(currPath)
 
 		case '/':
 			currMode = ModeSearch
@@ -425,8 +435,8 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 			updateFileListings(matches)
 
 		case tcell.KeyBackspace, 127:
-			logger.Debug("Processing a backspace...", "currSearchEntry", currSearchEntry, "newSearchEntry", currSearchEntry[:len(currSearchEntry) - 1])
-			currSearchEntry = currSearchEntry[:len(currSearchEntry) - 1]
+			logger.Debug("Processing a backspace...", "currSearchEntry", currSearchEntry, "newSearchEntry", currSearchEntry[:len(currSearchEntry)-1])
+			currSearchEntry = currSearchEntry[:len(currSearchEntry)-1]
 			matches, _ := searchInDir(currSearchEntry, files)
 			updateFileListings(matches)
 
@@ -463,7 +473,7 @@ func searchInDir(pattern string, candidateFiles []fs.DirEntry) ([]fs.DirEntry, e
 	if len(candidateFiles) == 0 {
 		return []fs.DirEntry{}, nil
 	}
-	// PERF: Use better / custom data structures to avoid these transformations.
+	// PERF: Use better/custom data structures to avoid these transformations.
 	result := []fs.DirEntry{}
 	candidates := []string{}
 	candidatesMap := make(map[string]fs.DirEntry)
@@ -495,13 +505,13 @@ func render(keyChanges chan *tcell.EventKey) {
 		switch currMode {
 		case ModeDefault:
 			if keyRune == 'h' || keyRune == 'j' || keyRune == 'k' || keyRune == 'l' || key == tcell.KeyCR {
-				drawFileList()
+				drawFileList(screen)
 				drawInfoLine()
 				screen.Show()
 			}
 
 		case ModeSearch:
-			drawFileList()
+			drawFileList(screen)
 			drawSearchLine(currSearchEntry)
 			screen.Show()
 		}
