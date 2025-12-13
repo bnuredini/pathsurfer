@@ -278,14 +278,6 @@ func drawSearchLine(screen tcell.Screen, searchEntry string) {
 	drawText(screen, 0, h-1, w, h-1, searchBarStyle, fmt.Sprintf("/%s", searchEntry))
 }
 
-func drawSearchList(screen tcell.Screen, searchEntry string) {
-	screen.Clear()
-	w, _ := screen.Size()
-
-	pathStyle := tcell.StyleDefault.Foreground(tcell.ColorBlue)
-	drawText(screen, 0, 0, w, 0, pathStyle, fmt.Sprintf("Path: %s", currPath))
-}
-
 func drawText(screen tcell.Screen, x1, y1, x2, y2 int, style tcell.Style, text string) {
 	logger.Debug("Drawing text", "x1", x1, "y1", y1, "x2", x2, "y2", y2, "text", text)
 	currCol := x1
