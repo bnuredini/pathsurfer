@@ -1,6 +1,6 @@
 module github.com/bnuredini/pathsurfer
 
-go 1.21
+go 1.25
 
 require github.com/gdamore/tcell/v2 v2.7.4
 
