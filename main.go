@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/fs"
 	"log"
@@ -56,8 +57,8 @@ func main() {
 		log.Fatalf("Failed to boot up: %v", err)
 	}
 
-	if len(os.Args) > 1 {
-		pathArg := strings.TrimSpace(os.Args[1])
+	if len(flag.Args()) > 0 {
+		pathArg := strings.TrimSpace(flag.Args()[0])
 
 		pathDirInfo, err := os.Stat(pathArg)
 		if os.IsNotExist(err) {
