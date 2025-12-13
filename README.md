@@ -2,6 +2,10 @@
 
 A tiny terminal utility for navigating through directiories more quickly.
 
+* [Screenshots](#screenshots)
+* [Installing](#installing)
+* [License](#license)
+
 ## Screenshots
 
 ![screenshot1.png](./docs/imgs/screenshot1.png)
