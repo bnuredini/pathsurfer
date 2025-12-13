@@ -500,7 +500,7 @@ func render(keyChanges chan *tcell.EventKey) {
 
 		switch currMode {
 		case ModeDefault:
-			if keyRune == 'h' || keyRune == 'j' || keyRune == 'k' || keyRune == 'l' || key == tcell.KeyBackspace || key == tcell.KeyCR || key == tcell.KeyTAB {
+			if keyRune == 'h' || keyRune == 'j' || keyRune == 'k' || keyRune == 'l' || keyRune == '.' || key == tcell.KeyBackspace || key == tcell.KeyCR || key == tcell.KeyTAB {
 				drawFileList(screen)
 				drawInfoLine(screen)
 				screen.Show()
