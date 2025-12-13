@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io/fs"
 	"log"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 
+	"github.com/bnuredini/pathsurfer/conf"
 	"github.com/bnuredini/pathsurfer/fuzzy"
 )
 
@@ -24,10 +24,6 @@ var (
 // TODO: Clean-up these global variables.
 
 var (
-	writeDebugLogs  bool
-	logFilePath     string
-	showHiddenFiles bool
-
 	screen tcell.Screen
 	logger *slog.Logger
 
@@ -54,50 +50,11 @@ const (
 	ModeSearch
 )
 
-const (
-	ProgramName = "pathsurfer"
-)
-
-var DefaultLogFilePath string
-
-func init() {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatal("Failed to access the user's home directory")
-	}
-
-	DefaultLogFilePath = filepath.Join(
-		home,
-		".local",
-		"share",
-		ProgramName,
-		fmt.Sprintf("%s.log", ProgramName),
-	)
-
-	positionHistory = make(map[string]int)
-}
-
 func main() {
-	// TOOD: Move these to config.go and add support for priting the config.
-	flag.BoolVar(
-		&writeDebugLogs,
-		"debug",
-		false,
-		"Determines whether debug logs are enabled (set to false by default)",
-	)
-	flag.BoolVar(
-		&showHiddenFiles,
-		"show-hidden-files",
-		false,
-		"Determines whether hidden files are shown (set to false by default)",
-	)
-	flag.StringVar(
-		&logFilePath,
-		"log-file",
-		DefaultLogFilePath,
-		"The path of the file used for storing logs",
-	)
-	flag.Parse()
+	config, err := conf.Init()
+	if err != nil {
+		log.Fatalf("Failed to boot up: %v", err)
+	}
 
 	if len(os.Args) > 1 {
 		pathArg := strings.TrimSpace(os.Args[1])
@@ -114,7 +71,7 @@ func main() {
 		currPath = pathArg
 	}
 
-	logDir := filepath.Dir(logFilePath)
+	logDir := filepath.Dir(config.LogFilePath)
 	logDirInfo, err := os.Stat(logDir)
 	if os.IsNotExist(err) {
 		err = os.Mkdir(logDir, 0755)
@@ -127,13 +84,13 @@ func main() {
 		log.Fatalf("Cannot store logs in %q because %[1]q is not a directory", logDir)
 	}
 
-	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	logFile, err := os.OpenFile(config.LogFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatalf("Failed to open log file: %v", err)
 	}
 
 	logHandlerOpts := &slog.HandlerOptions{}
-	if writeDebugLogs {
+	if config.WriteDebugLogs {
 		logHandlerOpts.Level = slog.LevelDebug
 	} else {
 		logHandlerOpts.Level = slog.LevelInfo
@@ -158,6 +115,8 @@ func main() {
 
 	logger.Info("Starting...", "buildTime", buildTime, "version", version)
 
+	positionHistory = make(map[string]int)
+
 	if strings.TrimSpace(currPath) == "" {
 		currPath, err = os.Getwd()
 		if err != nil {
@@ -179,7 +138,7 @@ func main() {
 	screen.SetStyle(tcell.StyleDefault.Background(tcell.ColorReset).Foreground(tcell.ColorReset))
 	screen.Clear()
 
-	updateFileListingsUsingPath(currPath)
+	updateFileListingsUsingPath(currPath, config)
 	drawFileList(screen)
 
 	finalPathToCd := ""
@@ -196,7 +155,7 @@ MainLoop:
 			drawFileList(screen)
 
 		case *tcell.EventKey:
-			result := handleKeyPress(ev)
+			result := handleKeyPress(ev, config)
 			if result.shouldQuit {
 				finalPathToCd = result.newPath
 				break MainLoop
@@ -213,10 +172,10 @@ MainLoop:
 	}
 }
 
-func updateFileListings(rawFiles []fs.DirEntry) {
+func updateFileListings(rawFiles []fs.DirEntry, config *conf.Config) {
 	logger.Debug("Updating file list...", "rawFileCount", len(rawFiles), "path", currPath)
 
-	if showHiddenFiles {
+	if config.ShowHiddenFiles {
 		logger.Debug("Showing hidden files.")
 		files = rawFiles
 	} else {
@@ -252,7 +211,7 @@ func updateFileListings(rawFiles []fs.DirEntry) {
 	)
 }
 
-func updateFileListingsUsingPath(path string) {
+func updateFileListingsUsingPath(path string, config *conf.Config) {
 	dir, err := os.ReadDir(path)
 	if err != nil {
 		if os.IsPermission(err) {
@@ -267,7 +226,7 @@ func updateFileListingsUsingPath(path string) {
 		return // TODO: Return an error here.
 	}
 
-	updateFileListings(dir)
+	updateFileListings(dir, config)
 }
 
 func drawFileList(screen tcell.Screen) {
@@ -276,7 +235,7 @@ func drawFileList(screen tcell.Screen) {
 
 	headerRowCount := 1
 	pathStyle := tcell.StyleDefault.Foreground(tcell.ColorBlue)
-	drawText(0, 0, w, 0, pathStyle, fmt.Sprintf("Path: %s", currPath))
+	drawText(screen, 0, 0, w, 0, pathStyle, fmt.Sprintf("Path: %s", currPath))
 
 	heightUsableForFiles := max(h-2, 0)
 
@@ -302,31 +261,31 @@ func drawFileList(screen tcell.Screen) {
 
 		logger.Debug(fmt.Sprintf("Drawing file %v at row %v", file.Name(), rowToDrawOn))
 
-		drawText(0, rowToDrawOn, w, rowToDrawOn, style, prefix+file.Name())
+		drawText(screen, 0, rowToDrawOn, w, rowToDrawOn, style, prefix+file.Name())
 	}
 }
 
-func drawInfoLine() {
+func drawInfoLine(screen tcell.Screen) {
 	w, h := screen.Size()
 	helpStyle := tcell.StyleDefault.Foreground(tcell.ColorYellow)
-	drawText(0, h-1, w, h-1, helpStyle, "(j/k: up/down) (l: enter) (h: parent) (. hidden) (q: quit)")
+	drawText(screen, 0, h-1, w, h-1, helpStyle, "(j/k: up/down) (l: enter) (h: parent) (. hidden) (q: quit)")
 }
 
-func drawSearchLine(searchEntry string) {
+func drawSearchLine(screen tcell.Screen, searchEntry string) {
 	w, h := screen.Size()
 	searchBarStyle := tcell.StyleDefault.Foreground(tcell.ColorYellow)
-	drawText(0, h-1, w, h-1, searchBarStyle, fmt.Sprintf("/%s", searchEntry))
+	drawText(screen, 0, h-1, w, h-1, searchBarStyle, fmt.Sprintf("/%s", searchEntry))
 }
 
-func drawSearchList(searchEntry string) {
+func drawSearchList(screen tcell.Screen, searchEntry string) {
 	screen.Clear()
 	w, _ := screen.Size()
 
 	pathStyle := tcell.StyleDefault.Foreground(tcell.ColorBlue)
-	drawText(0, 0, w, 0, pathStyle, fmt.Sprintf("Path: %s", currPath))
+	drawText(screen, 0, 0, w, 0, pathStyle, fmt.Sprintf("Path: %s", currPath))
 }
 
-func drawText(x1, y1, x2, y2 int, style tcell.Style, text string) {
+func drawText(screen tcell.Screen, x1, y1, x2, y2 int, style tcell.Style, text string) {
 	logger.Debug("Drawing text", "x1", x1, "y1", y1, "x2", x2, "y2", y2, "text", text)
 	currCol := x1
 	currRow := y1
@@ -349,7 +308,7 @@ type keyHandlingResult struct {
 	newPath    string
 }
 
-func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
+func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 	var result keyHandlingResult
 	logger.Debug("Handling key press", "keyRune", ev.Rune(), "keyString", string(ev.Rune()))
 
@@ -390,7 +349,7 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 
 			idxFromHistory, ok := positionHistory[newPath]
 			if !ok {
-				updateFileListingsUsingPath(currPath)
+				updateFileListingsUsingPath(currPath, config)
 
 				for i, f := range files {
 					if f.Name() == filepath.Base(oldPath) {
@@ -398,7 +357,7 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 					}
 				}
 			} else {
-				updateFileListingsUsingPath(currPath)
+				updateFileListingsUsingPath(currPath, config)
 				selectedIdx = idxFromHistory
 			}
 
@@ -407,7 +366,7 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 				positionHistory[currPath] = selectedIdx
 
 				currPath = filepath.Join(currPath, files[selectedIdx].Name())
-				updateFileListingsUsingPath(currPath)
+				updateFileListingsUsingPath(currPath, config)
 
 				if idxFromHistory, ok := positionHistory[currPath]; ok {
 					selectedIdx = idxFromHistory
@@ -417,8 +376,8 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 			}
 
 		case '.':
-			showHiddenFiles = !showHiddenFiles
-			updateFileListingsUsingPath(currPath)
+			config.ShowHiddenFiles = !config.ShowHiddenFiles
+			updateFileListingsUsingPath(currPath, config)
 
 		case '/':
 			currMode = ModeSearch
@@ -432,19 +391,19 @@ func handleKeyPress(ev *tcell.EventKey) keyHandlingResult {
 			currSearchEntry = currSearchEntry + string(ev.Rune())
 			matches, _ := searchInDir(currSearchEntry, files)
 			logger.Debug("Finished searching", "matches", matches)
-			updateFileListings(matches)
+			updateFileListings(matches, config)
 
 		case tcell.KeyBackspace, 127:
 			logger.Debug("Processing a backspace...", "currSearchEntry", currSearchEntry, "newSearchEntry", currSearchEntry[:len(currSearchEntry)-1])
 			currSearchEntry = currSearchEntry[:len(currSearchEntry)-1]
 			matches, _ := searchInDir(currSearchEntry, files)
-			updateFileListings(matches)
+			updateFileListings(matches, config)
 
 		case tcell.KeyCR:
 			currMode = ModeDefault
 			matches, _ := searchInDir(currSearchEntry, files)
 			currSearchEntry = ""
-			updateFileListings(matches) // TODO: Handle the error from search.
+			updateFileListings(matches, config) // TODO: Handle the error from search.
 
 		case tcell.KeyESC:
 			// Disable search mode and ignore the current search string.
@@ -506,13 +465,13 @@ func render(keyChanges chan *tcell.EventKey) {
 		case ModeDefault:
 			if keyRune == 'h' || keyRune == 'j' || keyRune == 'k' || keyRune == 'l' || key == tcell.KeyCR {
 				drawFileList(screen)
-				drawInfoLine()
+				drawInfoLine(screen)
 				screen.Show()
 			}
 
 		case ModeSearch:
 			drawFileList(screen)
-			drawSearchLine(currSearchEntry)
+			drawSearchLine(screen, currSearchEntry)
 			screen.Show()
 		}
 	}
