@@ -382,25 +382,69 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 		switch ev.Key() {
 		case tcell.KeyRune:
 			currSearchEntry = currSearchEntry + string(ev.Rune())
-			matches, _ := searchInDir(currSearchEntry, files)
-			logger.Debug("Finished searching", "matches", matches)
+			matches, _ := searchInDir(currSearchEntry, files) // TODO: Handle the error from search.
+			logger.Debug("Finished searching", "matches", matches, "pattern", currSearchEntry)
 			updateFileListings(matches, config)
 
 		case tcell.KeyBackspace, 127:
-			logger.Debug("Processing a backspace...", "currSearchEntry", currSearchEntry, "newSearchEntry", currSearchEntry[:len(currSearchEntry)-1])
-			currSearchEntry = currSearchEntry[:len(currSearchEntry)-1]
-			matches, _ := searchInDir(currSearchEntry, files)
-			updateFileListings(matches, config)
+			if len(currSearchEntry) == 0 {
+				break
+			}
+
+			currDirFiles, err := os.ReadDir(currPath)
+			if err != nil {
+				log.Fatalf("Failed to read path %q", currPath)
+			}
+
+			if len(currSearchEntry) == 1 {
+				currSearchEntry = ""
+				updateFileListings(currDirFiles, config)
+			} else {
+				currSearchEntry = currSearchEntry[:len(currSearchEntry)-1]
+				matches, _ := searchInDir(currSearchEntry, currDirFiles)
+				updateFileListings(matches, config)
+			}
 
 		case tcell.KeyCR:
+			if currSearchEntry == "" {
+				currDirFiles, err := os.ReadDir(currPath)
+				if err != nil {
+					log.Fatalf("Failed to read path %q", currPath)
+				}
+
+				updateFileListings(currDirFiles, config)
+			}
+
 			currMode = ModeDefault
-			matches, _ := searchInDir(currSearchEntry, files)
 			currSearchEntry = ""
-			updateFileListings(matches, config) // TODO: Handle the error from search.
 
 		case tcell.KeyESC:
 			// Disable search mode and ignore the current search string.
 			currMode = ModeDefault
+			currSearchEntry = ""
+
+		case tcell.KeyTAB:
+			if len(files) == 0 {
+				break
+			}
+
+			firstMatch := files[0]
+			if firstMatch.IsDir() {
+				if selectedIdx < len(files) && files[selectedIdx].IsDir() {
+					positionHistory[currPath] = selectedIdx
+
+					currPath = filepath.Join(currPath, files[selectedIdx].Name())
+					updateFileListingsUsingPath(currPath, config)
+
+					if idxFromHistory, ok := positionHistory[currPath]; ok {
+						selectedIdx = idxFromHistory
+					} else {
+						selectedIdx = 0
+					}
+				}
+			}
+
+			currSearchEntry = ""
 		}
 	}
 
@@ -456,7 +500,7 @@ func render(keyChanges chan *tcell.EventKey) {
 
 		switch currMode {
 		case ModeDefault:
-			if keyRune == 'h' || keyRune == 'j' || keyRune == 'k' || keyRune == 'l' || key == tcell.KeyCR {
+			if keyRune == 'h' || keyRune == 'j' || keyRune == 'k' || keyRune == 'l' || key == tcell.KeyBackspace || key == tcell.KeyCR || key == tcell.KeyTAB {
 				drawFileList(screen)
 				drawInfoLine(screen)
 				screen.Show()
