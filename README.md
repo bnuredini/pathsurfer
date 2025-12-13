@@ -8,9 +8,7 @@ A tiny terminal utility for navigating through directiories more quickly.
 
 ## Installing
 
-### Building locally
-
-#### Using `make`
+### Building locally with `make`
 
 Clone the repository:
 
@@ -38,7 +36,7 @@ make install/fish
 make install/bash
 ```
 
-#### Using the `go` toolchain
+### Building locally with the `go` toolchain
 
 If you don't have `make` installed in your system, you can build this project by using the Go
 toolchain directly.
