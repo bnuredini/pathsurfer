@@ -1,10 +1,10 @@
 binary_name = pathsurfer
 binary_path = ./bin/${binary_name}
-main_package_path = .
+main_package_path = ./cmd/pathsurfer
 
 curr_time = $(shell date --iso-8601=seconds)
 git_description = $(shell git describe --always --dirty)
-linker_flags = '-s -X github.com/bnuredini/pathsurfer/conf.buildTime=${curr_time} -X github.com/bnuredini/pathsurfer/conf.version=${git_description}'
+linker_flags = '-s -X github.com/bnuredini/pathsurfer/internal/conf.buildTime=${curr_time} -X github.com/bnuredini/pathsurfer/internal/conf.version=${git_description}'
 
 install_path = /usr/bin/pathsurfer
 script_install_dir_for_bash = $(HOME)/.local/share/pathsurfer/functions

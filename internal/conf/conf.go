@@ -99,7 +99,6 @@ func Init() (*Config, error) {
 	return result, nil
 }
 
-
 func printConfig(c Config) error {
 	configToPrint := Config{}
 	valToPrint := reflect.ValueOf(&configToPrint).Elem()

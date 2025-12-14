@@ -13,8 +13,8 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 
-	"github.com/bnuredini/pathsurfer/conf"
-	"github.com/bnuredini/pathsurfer/fuzzy"
+	"github.com/bnuredini/pathsurfer/internal/conf"
+	"github.com/bnuredini/pathsurfer/internal/fuzzy"
 )
 
 // TODO: Clean-up these global variables.
