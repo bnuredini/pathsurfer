@@ -54,21 +54,21 @@ git clone https://github.com/bnuredini/pathsurfer
 and run:
 
 ```
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o=./bin/pathsurfer .
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o=./bin/pathsurfer ./cmd/pathsurfer
 mkdir -p /usr/bin
-install -m 644 ./bin/pathsurfer /usr/bin/pathsurfer
+sudo install -m 644 ./bin/pathsurfer /usr/bin/pathsurfer
 ```
 
 To include the `psurf.sh` script into your Bash installation, make sure to add this line your `.bashrc`:
 
 ```
-source <path-to-repo>/scripts/psurf.sh
+source <path-to-this-repo>/scripts/psurf.sh
 ```
 
 To include the `psurf.fish` script into your Fish installation, run:
 
 ```
-install -m 644 <path-to-repo>/scripts/psurf.fish ~/.config/fish/conf.d/psurf.fish
+install -m 644 <path-to-this-repo>/scripts/psurf.fish ~/.config/fish/conf.d/psurf.fish
 ```
 
 ## License
