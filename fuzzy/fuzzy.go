@@ -1,20 +1,20 @@
 package fuzzy
 
 import (
-	"unicode/utf8"
 	"unicode"
+	"unicode/utf8"
 )
 
 type Match struct {
 	CandidateString string
-	Indexes []int
-	Score int
+	Indexes         []int
+	Score           int
 }
 
 const (
-	FirstCharBonus = 5
-	SeparatorBonus = 10
-	CamelCaseBonus = 8
+	FirstCharBonus   = 5
+	SeparatorBonus   = 10
+	CamelCaseBonus   = 8
 	ConsecutiveBonus = 5
 )
 
@@ -38,14 +38,14 @@ func Find(rawPattern string, candidates []string) []Match {
 		candidateCurr, candidateCurrSize := utf8.DecodeRuneInString(candidate)
 
 		for candidateIdx := 0; candidateIdx < len(candidate); candidateIdx += candidatePrevSize {
-			if equalFold(pattern[patternIdx], candidateCurr) {
+			if equalsIgnoreCase(pattern[patternIdx], candidateCurr) {
 				score := 1
 
 				if candidateIdx == 0 {
 					score += FirstCharBonus
 				}
 
-				if candidateIdx != 0 && (candidateIdx - 1 == runningMatchIdx) {
+				if candidateIdx != 0 && (candidateIdx-1 == runningMatchIdx) {
 					score += ConsecutiveBonus
 				}
 
@@ -72,11 +72,11 @@ func Find(rawPattern string, candidates []string) []Match {
 			}
 
 			var patternNext rune
-			if patternIdx + 1 < len(pattern) {
-				patternNext = pattern[patternIdx + 1]
+			if patternIdx+1 < len(pattern) {
+				patternNext = pattern[patternIdx+1]
 			}
 
-			if equalFold(patternNext, candidateNext) || candidateNext == 0 {
+			if equalsIgnoreCase(patternNext, candidateNext) || candidateNext == 0 {
 				patternIdx++
 
 				if runningMatchIdx == -1 {
@@ -105,7 +105,7 @@ func Find(rawPattern string, candidates []string) []Match {
 
 		distPenalty := 0
 		for i := 1; i < len(match.Indexes); i++ {
-			distPenalty += match.Indexes[i] - match.Indexes[i - 1]
+			distPenalty += match.Indexes[i] - match.Indexes[i-1]
 		}
 		match.Score -= distPenalty
 
@@ -115,32 +115,28 @@ func Find(rawPattern string, candidates []string) []Match {
 	return result
 }
 
-func equalFold(tr, sr rune) bool {
-	if tr == sr {
+func equalsIgnoreCase(searchChar, targetChar rune) bool {
+	if searchChar == targetChar {
 		return true
 	}
 
-	if tr < sr {
-		tr, sr = sr, tr
+	if searchChar < targetChar {
+		searchChar, targetChar = targetChar, searchChar
 	}
 
-	// Fast check for ASCII.
-	if tr < utf8.RuneSelf {
-		// ASCII, and sr is upper case.  tr must be lower case.
-		if 'A' <= sr && sr <= 'Z' && tr == sr+'a'-'A' {
+	if searchChar < utf8.RuneSelf {
+		if 'A' <= targetChar && targetChar <= 'Z' && searchChar == targetChar+'a'-'A' {
 			return true
 		}
 		return false
 	}
 
-	// General case. SimpleFold(x) returns the next equivalent rune > x
-	// or wraps around to smaller values.
-	r := unicode.SimpleFold(sr)
-	for r != sr && r < tr {
+	r := unicode.SimpleFold(targetChar)
+	for r != targetChar && r < searchChar {
 		r = unicode.SimpleFold(r)
 	}
 
-	return r == tr
+	return r == searchChar
 }
 
 func isSeparator(r rune) bool {

@@ -4,7 +4,7 @@ main_package_path = .
 
 curr_time = $(shell date --iso-8601=seconds)
 git_description = $(shell git describe --always --dirty)
-linker_flags = '-s -X main.buildTime=${curr_time} -X main.version=${git_description}'
+linker_flags = '-s -X github.com/bnuredini/pathsurfer/conf.buildTime=${curr_time} -X github.com/bnuredini/pathsurfer/conf.version=${git_description}'
 
 install_path = /usr/bin/pathsurfer
 script_install_dir_for_bash = $(HOME)/.local/share/pathsurfer/functions

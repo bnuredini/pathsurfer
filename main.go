@@ -17,11 +17,6 @@ import (
 	"github.com/bnuredini/pathsurfer/fuzzy"
 )
 
-var (
-	buildTime string
-	version   string
-)
-
 // TODO: Clean-up these global variables.
 
 var (
@@ -113,8 +108,6 @@ func main() {
 			}
 		}
 	}()
-
-	logger.Info("Starting...", "buildTime", buildTime, "version", version)
 
 	positionHistory = make(map[string]int)
 
