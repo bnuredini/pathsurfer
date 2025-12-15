@@ -1,7 +1,7 @@
 #!/bin/bash
 
 psurf() {
-    local app_path="/home/bleart/code/pathsurfer/bin/pathsurfer"
+    local app_path="/usr/bin/pathsurfer"
     local target_dir
 
     if [ ! -x "$app_path" ]; then
