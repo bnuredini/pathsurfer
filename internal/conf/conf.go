@@ -1,13 +1,13 @@
 package conf
 
 import (
-	"fmt"
+	"encoding/json"
 	"flag"
+	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"reflect"
-	"encoding/json"
-	"log"
 )
 
 var (
@@ -86,8 +86,9 @@ func Init() (*Config, error) {
 	flag.Parse()
 
 	if *displayVersion {
-		fmt.Printf("version:\t%s\n", version)
-		fmt.Printf("build time:\t%s\n", buildTime)
+		out := flag.CommandLine.Output()
+		fmt.Fprintf(out, "version:\t%s\n", version)
+		fmt.Fprintf(out, "build time:\t%s\n", buildTime)
 		os.Exit(0)
 	}
 
