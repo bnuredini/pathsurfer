@@ -1,7 +1,7 @@
 #!/bin/bash
 
 psurf() {
-    local app_path="/usr/bin/pathsurfer"
+    local app_path="/home/bleart/code/pathsurfer/bin/pathsurfer"
     local target_dir
 
     if [ ! -x "$app_path" ]; then
@@ -9,7 +9,7 @@ psurf() {
         return 1
     fi
 
-    target_dir=$("$app_path")
+    target_dir=$("$app_path" "$@")
 
     if [ -n "$target_dir" ] && [ -d "$target_dir" ]; then
         cd "$target_dir"
