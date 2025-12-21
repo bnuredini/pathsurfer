@@ -16,13 +16,13 @@ A tiny terminal utility for navigating through directiories more quickly.
 
 Clone the repository:
 
-```
+```bash
 git clone https://github.com/bnuredini/pathsurfer
 ```
 
 and run:
 
-```
+```bash
 make build
 sudo make install
 ```
@@ -32,42 +32,42 @@ The binary should be installed at `/usr/bin/pathsurfer`.
 Finally, make sure add the `psurf` function to your shell. Depending on which shell you're using,
 you should run one of the following commands:
 
-```
+```bash
 make install/fish
 ```
 
-```
+```bash
 make install/bash
 ```
 
-### Building locally with the `go` toolchain
+### Building locally with `go`
 
 If you don't have `make` installed in your system, you can build this project by using the Go
 toolchain directly.
 
 Clone the repository:
 
-```
+```bash
 git clone https://github.com/bnuredini/pathsurfer
 ```
 
 and run:
 
-```
+```bash
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o=./bin/pathsurfer ./cmd/pathsurfer
 mkdir -p /usr/bin
 sudo install -m 644 ./bin/pathsurfer /usr/bin/pathsurfer
 ```
 
-To include the `psurf.sh` script into your Bash installation, make sure to add this line your `.bashrc`:
+If you use bash, add this line to your `.bashrc`:
 
-```
+```bash
 source <path-to-this-repo>/scripts/psurf.sh
 ```
 
-To include the `psurf.fish` script into your Fish installation, run:
+If you use fish, run:
 
-```
+```bash
 install -m 644 <path-to-this-repo>/scripts/psurf.fish ~/.config/fish/conf.d/psurf.fish
 ```
 
