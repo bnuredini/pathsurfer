@@ -3,12 +3,20 @@
 A tiny terminal utility for navigating through directiories more quickly.
 
 * [Screenshots](#screenshots)
+* [Features](#features)
 * [Installing](#installing)
 * [License](#license)
 
 ## Screenshots
 
 ![screenshot1.png](./docs/imgs/screenshot1.png)
+
+## Features
+
+* Directory navigation
+* Fuzzy finding
+* Configurable settings
+* Integration with bash, zsh, and fish
 
 ## Installing
 
