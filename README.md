@@ -18,9 +18,14 @@ A tiny terminal utility for navigating through directiories more quickly.
 * Configurable settings
 * Integration with bash, zsh, and fish
 
+## Platforms
+
+* Linux
+* macOS
+
 ## Installing
 
-### Building locally with `make`
+### Option #1: Building locally with `make`
 
 Clone the repository:
 
@@ -48,7 +53,7 @@ make install/fish
 make install/bash
 ```
 
-### Building locally with `go`
+### Option #2: Building locally with `go`
 
 If you don't have `make` installed in your system, you can build this project by using the Go
 toolchain directly.
