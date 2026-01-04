@@ -4,7 +4,9 @@ A tiny terminal utility for navigating through directiories more quickly.
 
 * [Screenshots](#screenshots)
 * [Features](#features)
+* [Platforms](#platforms)
 * [Installing](#installing)
+* [Keybindings](#keybindings)
 * [License](#license)
 
 ## Screenshots
@@ -15,6 +17,7 @@ A tiny terminal utility for navigating through directiories more quickly.
 
 * Directory navigation
 * Fuzzy finding
+* Vi-like keybindings
 * Configurable settings
 * Integration with bash, zsh, and fish
 
@@ -85,7 +88,20 @@ If you use fish, run:
 install -m 644 <path-to-this-repo>/scripts/psurf.fish ~/.config/fish/conf.d/psurf.fish
 ```
 
+## Keybindings
+
+| Action              | Key | Description                 |
+|---------------------|-----|-----------------------------|
+| Move up             | k   | Move up in the file list    |
+| Move down           | j   | Move down in the file list  |
+| Go back             | h   | Go back one directory       |
+| Go forward          | l   | Change into a directory     |
+| Search              | /   | Enter search mode           |
+| Toggle hidden files | .   | Toggle hidden files in list |
+| Quit                | q   | Quits the program           |
+
 ## License
 
-This project is released under the MIT license. See the [LICENSE](./LICENSE) file for more 
-information.
+This project is released under the MIT license. For more information, see the 
+[LICENSE](./LICENSE) file.
+
