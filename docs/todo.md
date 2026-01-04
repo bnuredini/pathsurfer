@@ -1,5 +1,6 @@
 # To-do list
 
+* Add support for Windows.
 * Write install script.
 * Add keybinding for opening pathsurfer.
 * Add support for vertical panes.

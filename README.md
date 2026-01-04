@@ -22,6 +22,7 @@ A tiny terminal utility for navigating through directiories more quickly.
 
 * Linux
 * macOS
+* Planned: Windows
 
 ## Installing
 
