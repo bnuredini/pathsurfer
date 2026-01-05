@@ -15,7 +15,7 @@ zshrc = $(HOME)/.zshrc
 ## build: build the application
 .PHONY: build
 build:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags=${linker_flags} -o=${binary_path} ${main_package_path}
+	CGO_ENABLED=0 go build -ldflags=${linker_flags} -o=${binary_path} ${main_package_path}
 
 ## install: install the application
 .PHONY: install
