@@ -2,10 +2,15 @@
 
 A tiny terminal utility for navigating through directiories more quickly.
 
+> ⚠️ **WARNING**
+>
+> This project is in an **early experimental phase**. It's under active development, behavior may
+> change at any time.
+
 * [Screenshots](#screenshots)
 * [Features](#features)
 * [Platforms](#platforms)
-* [Installing](#installing)
+* [Building locally](#building-locally)
 * [Keybindings](#keybindings)
 * [License](#license)
 
@@ -27,7 +32,7 @@ A tiny terminal utility for navigating through directiories more quickly.
 * macOS
 * Planned: Windows
 
-## Installing
+## Building locally
 
 ### Option #1: Building locally with `make`
 
@@ -44,17 +49,16 @@ make build
 sudo make install
 ```
 
-The binary should be installed at `/usr/bin/pathsurfer`.
-
-Finally, make sure add the `psurf` function to your shell. Depending on which shell you're using,
-you should run one of the following commands:
-
-```bash
-make install/fish
-```
+If you use bash or zsh, run the following command (which will integrate pathsurfer with your shell):
 
 ```bash
 make install/bash
+```
+
+If you use fish, run:
+
+```bash
+make install/fish
 ```
 
 ### Option #2: Building locally with `go`
@@ -72,7 +76,6 @@ and run:
 
 ```bash
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o=./bin/pathsurfer ./cmd/pathsurfer
-mkdir -p /usr/bin
 sudo install -m 644 ./bin/pathsurfer /usr/bin/pathsurfer
 ```
 
