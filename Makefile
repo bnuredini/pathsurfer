@@ -1,6 +1,11 @@
+main_package_path = ./cmd/pathsurfer
+
 binary_name = pathsurfer
 binary_path = ./bin/${binary_name}
-main_package_path = ./cmd/pathsurfer
+binary_ext =
+ifeq ($(GOOS),windows)
+	binary_ext = .exe
+endif
 
 curr_time = $(shell date --iso-8601=seconds)
 git_description = $(shell git describe --always --dirty)
@@ -15,7 +20,7 @@ zshrc = $(HOME)/.zshrc
 ## build: build the application
 .PHONY: build
 build:
-	CGO_ENABLED=0 go build -ldflags=${linker_flags} -o=${binary_path} ${main_package_path}
+	CGO_ENABLED=0 go build -ldflags=${linker_flags} -o=${binary_path}${binary_ext} ${main_package_path}
 
 ## install: install the application
 .PHONY: install
