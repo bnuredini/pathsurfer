@@ -98,14 +98,17 @@ uninstall/zsh:
 ## run: run the binary
 .PHONY: run
 run:
-	${binary_path}
+	${binary_path}${binary_ext}
 
 ## run/live: run the application with reloading on file changes
 .PHONY: run/live
 run/live:
-	go run github.com/cosmtrek/air@v1.52.0 \
-		--build.cmd "make build" \
-		--build.bin "${binary_path}" \
-		--build.delay "100" \
-		--build.exclude_dir "" \
-		--misc.clean_on_exit "true"
+	watchexec \
+		--restart \
+		--clear \
+		--wrap-process=none \
+		--watch cmd \
+		--watch internal \
+		--watch go.mod \
+		--watch go.sum \
+		--exts go -- "make build && ${binary_path}${binary_ext}"
