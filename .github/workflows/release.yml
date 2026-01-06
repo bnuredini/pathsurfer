@@ -40,9 +40,9 @@ jobs:
           mkdir -p packaged
 
           if [ "$GOOS" = "windows" ]; then
-            zip "packaged/pathsurfer-${GOOS}-${GOARCH}.zip" ./bin/pathsurfer.exe
+            (cd bin && zip "../packaged/pathsurfer-${GOOS}-${GOARCH}.zip" ./pathsurfer.exe)
           else
-            tar czf "packaged/pathsurfer-${GOOS}-${GOARCH}.tar.gz" ./bin/pathsurfer
+            tar -C bin -czf "packaged/pathsurfer-${GOOS}-${GOARCH}.tar.gz" ./pathsurfer
           fi
         env:
           GOOS: ${{ matrix.os }}
