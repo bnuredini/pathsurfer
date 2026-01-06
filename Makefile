@@ -94,3 +94,18 @@ uninstall/zsh:
 	sed -i '\|# Load psurf shell function|d' $(zshrc) || true
 	sed -i '\|source $(script_install_dir)/psurf.sh|d' $(zshrc) || true
 	@echo -e "\nUninstallation completed"
+
+## run: run the binary
+.PHONY: run
+run:
+	${binary_path}
+
+## run/live: run the application with reloading on file changes
+.PHONY: run/live
+run/live:
+	go run github.com/cosmtrek/air@v1.52.0 \
+		--build.cmd "make build" \
+		--build.bin "${binary_path}" \
+		--build.delay "100" \
+		--build.exclude_dir "" \
+		--misc.clean_on_exit "true"
