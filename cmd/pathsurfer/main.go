@@ -75,7 +75,7 @@ func main() {
 			log.Printf("Failed to create %q for storing logs", logDir)
 		}
 	} else if err != nil {
-		log.Fatalf("Failed to use %q for storing logs: %v", logDirInfo, err)
+		log.Fatalf("Failed to use %q for storing logs: %v", logDir, err)
 	} else if !logDirInfo.IsDir() {
 		log.Fatalf("Cannot store logs in %q because %[1]q is not a directory", logDir)
 	}
@@ -97,7 +97,7 @@ func main() {
 
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("application panicked", "panic", r)
+			logger.Error("Application panicked", "panic", r)
 		}
 
 		if logFile != nil {
@@ -108,8 +108,6 @@ func main() {
 			}
 		}
 	}()
-
-	positionHistory = make(map[string]int)
 
 	if strings.TrimSpace(currPath) == "" {
 		currPath, err = os.Getwd()
@@ -128,14 +126,28 @@ func main() {
 		logger.Error("Couldn't initialize screen", "err", err)
 		os.Exit(1)
 	}
+	defer screen.Fini()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		screen.Fini()
+		if logFile != nil {
+			_ = logFile.Close()
+		}
+		os.Exit(0)
+	}()
 
 	screen.SetStyle(tcell.StyleDefault.Background(tcell.ColorReset).Foreground(tcell.ColorReset))
 	screen.Clear()
 
+	finalPathToCd := ""
+	positionHistory = make(map[string]int)
+
 	updateFileListingsUsingPath(currPath, config)
 	drawFileList(screen)
 
-	finalPathToCd := ""
 	keyEntered := make(chan *tcell.EventKey)
 
 	go render(keyEntered)
@@ -143,6 +155,7 @@ func main() {
 MainLoop:
 	for {
 		ev := screen.PollEvent()
+
 		switch ev := ev.(type) {
 		case *tcell.EventResize:
 			screen.Sync()
@@ -159,8 +172,9 @@ MainLoop:
 		}
 	}
 
-	screen.Fini()
-
+	// Assuming that the user is using one of the wrapper scripts (psurf.sh or 
+	// psurf.fish), this program will print the current directory and the wrapper
+	// will change the directory to it.
 	if finalPathToCd != "" {
 		fmt.Println(finalPathToCd)
 	}
