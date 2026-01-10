@@ -7,9 +7,11 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 
 	"github.com/gdamore/tcell/v2"
 
@@ -31,7 +33,8 @@ var (
 	// Used when the number of files is higher than what can fit on the screen.
 	// This value indicates how many lines/rows have been scrolled past by the
 	// user.
-	scrollOffset int
+	scrollOffset       int
+	parentScrollOffset int
 	// Keeps track of which position the cursor / selected row was on last time
 	// for a given directory. This improves the experience of navigation by
 	// allowing the user to quickly go back to the original path after they've
@@ -44,6 +47,10 @@ type Mode int
 const (
 	ModeDefault Mode = iota
 	ModeSearch
+)
+
+var (
+	StylePathIndicator = tcell.StyleDefault.Foreground(tcell.ColorBlue)
 )
 
 func main() {
@@ -128,10 +135,10 @@ func main() {
 	}
 	defer screen.Fini()
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		<-sigCh
+		<-signalCh
 		screen.Fini()
 		if logFile != nil {
 			_ = logFile.Close()
@@ -146,11 +153,11 @@ func main() {
 	positionHistory = make(map[string]int)
 
 	updateFileListingsUsingPath(currPath, config)
-	drawFileList(screen)
+	drawFileList(screen, config)
 
-	keyEntered := make(chan *tcell.EventKey)
+	keyEnteredCh := make(chan *tcell.EventKey)
 
-	go render(keyEntered)
+	go render(keyEnteredCh, config)
 
 MainLoop:
 	for {
@@ -159,7 +166,7 @@ MainLoop:
 		switch ev := ev.(type) {
 		case *tcell.EventResize:
 			screen.Sync()
-			drawFileList(screen)
+			drawFileList(screen, config)
 
 		case *tcell.EventKey:
 			result := handleKeyPress(ev, config)
@@ -168,11 +175,11 @@ MainLoop:
 				break MainLoop
 			}
 
-			keyEntered <- ev
+			keyEnteredCh <- ev
 		}
 	}
 
-	// Assuming that the user is using one of the wrapper scripts (psurf.sh or 
+	// Assuming that the user is using one of the wrapper scripts (psurf.sh or
 	// psurf.fish), this program will print the current directory and the wrapper
 	// will change the directory to it.
 	if finalPathToCd != "" {
@@ -180,11 +187,41 @@ MainLoop:
 	}
 }
 
-func updateFileListings(rawFiles []fs.DirEntry, config *conf.Config) {
-	logger.Debug("Updating file list...", "rawFileCount", len(rawFiles), "path", currPath)
+func getFilteredDirEntires(path string, config *conf.Config) []fs.DirEntry {
+	result := []fs.DirEntry{}
+
+	if strings.TrimSpace(path) == "" {
+		return result
+	}
+
+	rawFiles, err := os.ReadDir(path)
+	if err != nil {
+		// TODO: Return an error value here and display it on the screen.
+		logger.Debug("Failed to read directory", "path", path, "err", err)
+		return result
+	}
 
 	if config.ShowHiddenFiles {
-		logger.Debug("Showing hidden files.")
+		result = rawFiles
+	} else {
+		result = []fs.DirEntry{}
+
+		for _, f := range rawFiles {
+			if !strings.HasPrefix(f.Name(), ".") {
+				result = append(result, f)
+			}
+		}
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name() < result[j].Name()
+	})
+
+	return result
+}
+
+func updateFileListings(rawFiles []fs.DirEntry, config *conf.Config) {
+	if config.ShowHiddenFiles {
 		files = rawFiles
 	} else {
 		files = []fs.DirEntry{}
@@ -200,23 +237,15 @@ func updateFileListings(rawFiles []fs.DirEntry, config *conf.Config) {
 		return files[i].Name() < files[j].Name()
 	})
 
-	// Adjust the current file marker if it's out of bounds.
 	if len(files) == 0 {
 		selectedIdx = 0
 	} else if selectedIdx >= len(files) {
 		selectedIdx = len(files) - 1
 	}
 
-	logger.Debug("Selected index after bounds check", "selectedIdx", selectedIdx)
-
-	// Adjust scrollOffset to ensure the selected index is visible.
 	_, screenHeight := screen.Size()
 	heightUsableForFiles := max(screenHeight-2, 1)
-	scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
-
-	logger.Debug(
-		"Finished updating the file listing", "selectedIndex", selectedIdx, "scrollOffset", scrollOffset,
-	)
+	scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
 }
 
 func updateFileListingsUsingPath(path string, config *conf.Config) {
@@ -237,39 +266,110 @@ func updateFileListingsUsingPath(path string, config *conf.Config) {
 	updateFileListings(dir, config)
 }
 
-func drawFileList(screen tcell.Screen) {
+func drawFileList(screen tcell.Screen, config *conf.Config) {
 	screen.Clear()
+
 	w, h := screen.Size()
+	paneWidth := w / 3
 
-	headerRowCount := 1
-	pathStyle := tcell.StyleDefault.Foreground(tcell.ColorBlue)
-	drawText(screen, 0, 0, w, 0, pathStyle, fmt.Sprintf("Path: %s", currPath))
+	leftPaneDimensions := paneDimensions{
+		x1: 0,
+		y1: 1,
+		x2: paneWidth,
+		y2: h - 1,
+	}
+	mainPaneDimensions := paneDimensions{
+		x1: leftPaneDimensions.x2 + 2, 
+		y1: 1, 
+		x2: leftPaneDimensions.x2 + paneWidth, 
+		y2: h - 1,
+	}
+	rightPaneDimensions := paneDimensions{
+		x1: mainPaneDimensions.x2 + 2, 
+		y1: 1, 
+		x2: mainPaneDimensions.x2 + paneWidth, 
+		y2: h - 1,
+	}
 
-	heightUsableForFiles := max(h-2, 0)
+	sep1X := leftPaneDimensions.x2 + 1
+	sep2X := mainPaneDimensions.x2 + 1
+
+	for i := range h {
+		screen.SetContent(sep1X, i, '|', nil, tcell.StyleDefault)
+		screen.SetContent(sep2X, i, '|', nil, tcell.StyleDefault)
+	}
+
+	drawText(screen, 0, 0, w, 0, StylePathIndicator, fmt.Sprintf("Parent: %s", currPath))
+	drawText(screen, mainPaneDimensions.x1, 0, w, 0, StylePathIndicator, fmt.Sprintf("Navigating: %s", currPath))
+
+	files := getFilteredDirEntires(currPath, config)
+
+	parentSelectedIdx := 0
+	parentFiles := []fs.DirEntry{}
+	parentDir := filepath.Dir(currPath)
+
+	if strings.TrimSpace(parentDir) != "" || parentDir != "/" {
+		parentFiles = getFilteredDirEntires(filepath.Dir(currPath), config)
+
+		for i, f := range parentFiles {
+			if f.Name() == filepath.Base(currPath) {
+				parentSelectedIdx = i
+			}
+		}
+	}
+
+	parentScrollOffset = calculateScrollOffset(
+		parentSelectedIdx,
+		parentScrollOffset,
+		max(h-2, 1),
+		len(parentFiles),
+	)
+
+	childFiles := []fs.DirEntry{}
+	if files[selectedIdx].IsDir() {
+		childDir := filepath.Join(currPath, files[selectedIdx].Name())
+		childFiles = getFilteredDirEntires(childDir, config)
+	}
+
+	drawPane(screen, parentFiles, leftPaneDimensions, parentSelectedIdx, parentScrollOffset)
+	drawPane(screen, files, mainPaneDimensions, selectedIdx, scrollOffset)
+	drawPane(screen, childFiles, rightPaneDimensions, 0, 0)
+}
+
+type paneDimensions struct {
+	x1, y1, x2, y2 int
+}
+
+func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions paneDimensions, selectedMarker int, scrollMarker int) {
+	heightUsableForFiles := dimensions.y2 - dimensions.y1
 
 	for i := 0; i < heightUsableForFiles; i++ {
-		fileIdx := scrollOffset + i
-		if fileIdx >= len(files) {
+		fileIdx := scrollMarker + i
+		if fileIdx >= len(entries) {
 			break
 		}
 
-		file := files[fileIdx]
-		rowToDrawOn := i + headerRowCount
-
-		style := tcell.StyleDefault
 		prefix := "  "
+		style := tcell.StyleDefault
+		file := entries[fileIdx]
 
 		if file.IsDir() {
-			style = style.Foreground(tcell.ColorGreen)
 			prefix = "📁 "
+			style = style.Foreground(tcell.ColorGreen)
 		}
-		if fileIdx == selectedIdx {
+		if fileIdx == selectedMarker {
 			style = style.Background(tcell.ColorDarkGray).Foreground(tcell.ColorWhite)
 		}
 
-		logger.Debug(fmt.Sprintf("Drawing file %v at row %v", file.Name(), rowToDrawOn))
-
-		drawText(screen, 0, rowToDrawOn, w, rowToDrawOn, style, prefix+file.Name())
+		drawText(
+			screen,
+			dimensions.x1,
+			i+1,
+			dimensions.x2,
+			i+1,
+			style,
+			fmt.Sprintf("%s%s", prefix, file.Name()),
+		)
 	}
 }
 
@@ -286,7 +386,6 @@ func drawSearchLine(screen tcell.Screen, searchEntry string) {
 }
 
 func drawText(screen tcell.Screen, x1, y1, x2, y2 int, style tcell.Style, text string) {
-	logger.Debug("Drawing text", "x1", x1, "y1", y1, "x2", x2, "y2", y2, "text", text)
 	currCol := x1
 	currRow := y1
 
@@ -310,7 +409,6 @@ type keyHandlingResult struct {
 
 func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 	var result keyHandlingResult
-	logger.Debug("Handling key press", "keyRune", ev.Rune(), "keyString", string(ev.Rune()))
 
 	if currMode == ModeDefault && ev.Key() == tcell.KeyRune {
 		switch ev.Rune() {
@@ -326,7 +424,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 			_, screenHeight := screen.Size()
 			heightUsableForFiles := max(screenHeight-2, 1)
 
-			scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
+			scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
 
 		case 'k':
 			if len(files) == 0 {
@@ -337,10 +435,9 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 			_, screenHeight := screen.Size()
 			heightUsableForFiles := max(screenHeight-2, 1)
 
-			scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles)
+			scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
 
 		case 'h':
-			logger.Debug("Updating position history...", "path", currPath, "idx", selectedIdx)
 			positionHistory[currPath] = selectedIdx
 
 			oldPath := currPath
@@ -363,6 +460,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 
 		case 'l':
 			if selectedIdx < len(files) && files[selectedIdx].IsDir() {
+				parentScrollOffset = scrollOffset
 				positionHistory[currPath] = selectedIdx
 
 				currPath = filepath.Join(currPath, files[selectedIdx].Name())
@@ -390,7 +488,6 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 		case tcell.KeyRune:
 			currSearchEntry = currSearchEntry + string(ev.Rune())
 			matches, _ := searchInDir(currSearchEntry, files) // TODO: Handle the error from search.
-			logger.Debug("Finished searching", "matches", matches, "pattern", currSearchEntry)
 			updateFileListings(matches, config)
 
 		case tcell.KeyBackspace, 127:
@@ -458,18 +555,27 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 	return result
 }
 
-func calculateScrollOffset(selectedIdx, currScrollOffset, heightUsableForFiles int) int {
+// TODO: Wrapping is buggy right now. Try wrapping in a directory with a lot of files.
+func calculateScrollOffset(selectedIdx, currScrollOffset, heightUsableForFiles, listLen int) int {
+	result := 0
+
 	if selectedIdx < currScrollOffset {
-		return selectedIdx
+		// Gone over the top edge. The scroll marker should be where the current
+		// file marker is.
+		result = selectedIdx
 	} else if selectedIdx >= currScrollOffset+heightUsableForFiles {
-		// Since the file marker is at the bottom, the scroll marker should be
-		// (heightUsableForFileList - 1) rows behind the file marker.
-		return selectedIdx - (heightUsableForFiles - 1)
+		// Gone over the bottom edge. Since the file marker is at the bottom,
+		// the scroll marker should be (heightUsableForFileList - 1) rows behind
+		// the file marker.
+		result = selectedIdx - (heightUsableForFiles - 1)
+	} else {
+		// Keep the scroll offset the same as long as the edges are not being touched.
+		result = currScrollOffset
 	}
 
-	maxPossibleScrollOffset := max((len(files)-1)-heightUsableForFiles, 0)
+	maxOffset := max((listLen-1)-heightUsableForFiles, 0)
 
-	return min(currScrollOffset, maxPossibleScrollOffset)
+	return min(result, maxOffset)
 }
 
 func searchInDir(pattern string, candidateFiles []fs.DirEntry) ([]fs.DirEntry, error) {
@@ -496,7 +602,7 @@ func searchInDir(pattern string, candidateFiles []fs.DirEntry) ([]fs.DirEntry, e
 	return result, nil
 }
 
-func render(keyChanges chan *tcell.EventKey) {
+func render(keyChanges chan *tcell.EventKey, config *conf.Config) {
 	logger.Debug("Started listening for changes to the listing...")
 	for {
 		eventKey := <-keyChanges
@@ -508,13 +614,13 @@ func render(keyChanges chan *tcell.EventKey) {
 		switch currMode {
 		case ModeDefault:
 			if keyRune == 'h' || keyRune == 'j' || keyRune == 'k' || keyRune == 'l' || keyRune == '.' || key == tcell.KeyBackspace || key == tcell.KeyCR || key == tcell.KeyTAB {
-				drawFileList(screen)
+				drawFileList(screen, config)
 				drawInfoLine(screen)
 				screen.Show()
 			}
 
 		case ModeSearch:
-			drawFileList(screen)
+			drawFileList(screen, config)
 			drawSearchLine(screen, currSearchEntry)
 			screen.Show()
 		}
