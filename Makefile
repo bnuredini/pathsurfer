@@ -32,9 +32,10 @@ install:
 ## install/fish: install the binary stored in <project-path>/bin/ for fish
 .PHONY: install/fish
 install/fish:
-	@echo "Installing the psurf script to $(script_install_dir_for_fish)/psurf.fish"
+	@echo "Installing psurf scripts to $(script_install_dir_for_fish)/psurf.fish"
 	mkdir -p $(script_install_dir_for_fish)
 	install -m 644 scripts/psurf.fish $(script_install_dir_for_fish)
+	install -m 644 scripts/psurf_key_bindings.fish $(script_install_dir_for_fish)
 	@echo -e "\nInstallation complete. Run 'source $(script_install_dir_for_fish)/psurf.fish' or restart your shell to use psurf."
 
 ## install/bash: install the binary stored in <project-path>/bin/ for bash
