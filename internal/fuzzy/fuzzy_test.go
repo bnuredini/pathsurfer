@@ -6,10 +6,10 @@ import (
 )
 
 func TestGeneral(t *testing.T) {
-	data := []struct{
-		Pattern string
+	data := []struct {
+		Pattern    string
 		Candidates []string
-		Want []Match
+		Want       []Match
 	}{
 		{
 			"abc",
@@ -17,8 +17,8 @@ func TestGeneral(t *testing.T) {
 			[]Match{
 				Match{
 					CandidateString: "alpha-beta-cents",
-					Indexes: []int{0, 6, 11},
-					Score: 17,
+					Indexes:         []int{0, 6, 11},
+					Score:           17,
 				},
 			},
 		},
