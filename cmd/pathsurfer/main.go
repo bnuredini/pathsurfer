@@ -410,6 +410,12 @@ type keyHandlingResult struct {
 func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 	var result keyHandlingResult
 
+	// Some terminals deliver Ctrl+C as \x03. Code point 3 is the ASCII ETX 
+	// control character. 
+	if ev.Key() == tcell.KeyCtrlC || ev.Rune() == 3 { 
+		return keyHandlingResult{shouldQuit: true, newPath: currPath}
+	}
+
 	if currMode == ModeDefault && ev.Key() == tcell.KeyRune {
 		switch ev.Rune() {
 		case 'q':
