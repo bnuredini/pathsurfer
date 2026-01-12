@@ -326,8 +326,6 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	childFiles := []fs.DirEntry{}
 	if selectedIdx < len(files) && files[selectedIdx].IsDir() {
 		childDir := filepath.Join(currPath, files[selectedIdx].Name())
-		// BUG: This is causing a crash if the search entry is not found in the
-		// current path.
 		childFiles = getFilteredDirEntires(childDir, config)
 	}
 
