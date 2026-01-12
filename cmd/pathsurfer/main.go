@@ -302,8 +302,6 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	drawText(screen, 0, 0, w, 0, StylePathIndicator, fmt.Sprintf("Parent: %s", currPath))
 	drawText(screen, mainPaneDimensions.x1, 0, w, 0, StylePathIndicator, fmt.Sprintf("Navigating: %s", currPath))
 
-	files := getFilteredDirEntires(currPath, config)
-
 	parentSelectedIdx := 0
 	parentFiles := []fs.DirEntry{}
 	parentDir := filepath.Dir(currPath)
