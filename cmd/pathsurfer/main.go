@@ -326,6 +326,8 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	childFiles := []fs.DirEntry{}
 	if files[selectedIdx].IsDir() {
 		childDir := filepath.Join(currPath, files[selectedIdx].Name())
+		// BUG: This is causing a crash if the search entry is not found in the
+		// current path.
 		childFiles = getFilteredDirEntires(childDir, config)
 	}
 
@@ -341,7 +343,7 @@ type paneDimensions struct {
 func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions paneDimensions, selectedMarker int, scrollMarker int) {
 	heightUsableForFiles := dimensions.y2 - dimensions.y1
 
-	for i := 0; i < heightUsableForFiles; i++ {
+	for i := range heightUsableForFiles {
 		fileIdx := scrollMarker + i
 		if fileIdx >= len(entries) {
 			break
@@ -408,9 +410,9 @@ type keyHandlingResult struct {
 func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 	var result keyHandlingResult
 
-	// Some terminals deliver Ctrl+C as \x03. Code point 3 is the ASCII ETX 
-	// control character. 
-	if ev.Key() == tcell.KeyCtrlC || ev.Rune() == 3 { 
+	// Some terminals deliver Ctrl+C as \x03. Code point 3 is the ASCII ETX
+	// control character.
+	if ev.Key() == tcell.KeyCtrlC || ev.Rune() == 3 {
 		return keyHandlingResult{shouldQuit: true, newPath: currPath}
 	}
 
@@ -606,6 +608,7 @@ func searchInDir(pattern string, candidateFiles []fs.DirEntry) ([]fs.DirEntry, e
 	return result, nil
 }
 
+// Render takes in the key changes and handles them appropriately.
 func render(keyChanges chan *tcell.EventKey, config *conf.Config) {
 	logger.Debug("Started listening for changes to the listing...")
 	for {
