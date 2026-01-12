@@ -324,7 +324,7 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	)
 
 	childFiles := []fs.DirEntry{}
-	if files[selectedIdx].IsDir() {
+	if selectedIdx < len(files) && files[selectedIdx].IsDir() {
 		childDir := filepath.Join(currPath, files[selectedIdx].Name())
 		// BUG: This is causing a crash if the search entry is not found in the
 		// current path.
@@ -408,8 +408,6 @@ type keyHandlingResult struct {
 }
 
 func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
-	var result keyHandlingResult
-
 	// Some terminals deliver Ctrl+C as \x03. Code point 3 is the ASCII ETX
 	// control character.
 	if ev.Key() == tcell.KeyCtrlC || ev.Rune() == 3 {
@@ -485,7 +483,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 
 		case '/':
 			currMode = ModeSearch
-			return result
+			return keyHandlingResult{shouldQuit: false, newPath: ""}
 		}
 	}
 
@@ -558,7 +556,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 		}
 	}
 
-	return result
+	return keyHandlingResult{shouldQuit: false, newPath: ""}
 }
 
 // TODO: Wrapping is buggy right now. Try wrapping in a directory with a lot of files.
@@ -608,7 +606,6 @@ func searchInDir(pattern string, candidateFiles []fs.DirEntry) ([]fs.DirEntry, e
 	return result, nil
 }
 
-// Render takes in the key changes and handles them appropriately.
 func render(keyChanges chan *tcell.EventKey, config *conf.Config) {
 	logger.Debug("Started listening for changes to the listing...")
 	for {
