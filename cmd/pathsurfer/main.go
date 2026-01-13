@@ -603,7 +603,6 @@ func searchInDir(pattern string, candidateFiles []fs.DirEntry) ([]fs.DirEntry, e
 }
 
 func render(keyChanges chan *tcell.EventKey, config *conf.Config) {
-	logger.Debug("Started listening for changes to the listing...")
 	for {
 		eventKey := <-keyChanges
 		keyRune := eventKey.Rune()
