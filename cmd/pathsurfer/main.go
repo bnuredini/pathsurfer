@@ -389,8 +389,6 @@ func drawInfoLine(screen tcell.Screen) {
 	)
 }
 
-
-
 func drawText(screen tcell.Screen, dimensions v4, style tcell.Style, text string) {
 	currCol := dimensions.x1
 	currRow := dimensions.y1
@@ -533,7 +531,10 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 			currSearchEntry = ""
 
 		case tcell.KeyESC:
-			return keyHandlingResult{shouldQuit: true, newPath: currPath}
+			// Disable search mode and ignore the current search string. This is
+			// consistent with how searching work in Vim.
+			currMode = ModeDefault
+			currSearchEntry = ""
 
 		case tcell.KeyTAB:
 			if len(files) == 0 {
