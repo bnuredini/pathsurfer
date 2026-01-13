@@ -29,17 +29,18 @@ var (
 	currMode        Mode
 	currSearchEntry string
 	files           []fs.DirEntry
-	selectedIdx     int
-	// Used when the number of files is higher than what can fit on the screen.
-	// This value indicates how many lines/rows have been scrolled past by the
-	// user.
-	scrollOffset       int
-	parentScrollOffset int
 	// Keeps track of which position the cursor / selected row was on last time
 	// for a given directory. This improves the experience of navigation by
 	// allowing the user to quickly go back to the original path after they've
 	// changed directories multiple times.
 	positionHistory map[string]int
+
+	// Used when the number of files is higher than what can fit on the screen.
+	// This value indicates how many lines/rows have been scrolled past by the
+	// user.
+	scrollOffset       int
+	parentScrollOffset int
+	selectedIdx        int
 )
 
 type Mode int
@@ -50,7 +51,8 @@ const (
 )
 
 var (
-	StylePathIndicator = tcell.StyleDefault.Foreground(tcell.ColorBlue)
+	StylePathIndicator = tcell.StyleDefault.Foreground(tcell.ColorGray)
+	StyleActivePathIndicator = tcell.StyleDefault.Foreground(tcell.ColorBlue)
 )
 
 func main() {
@@ -156,7 +158,6 @@ func main() {
 	drawFileList(screen, config)
 
 	keyEnteredCh := make(chan *tcell.EventKey)
-
 	go render(keyEnteredCh, config)
 
 MainLoop:
@@ -272,21 +273,21 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	w, h := screen.Size()
 	paneWidth := w / 3
 
-	leftPaneDimensions := paneDimensions{
+	leftPaneDimensions := v4{
 		x1: 0,
-		y1: 1,
+		y1: 2,
 		x2: paneWidth,
 		y2: h - 1,
 	}
-	mainPaneDimensions := paneDimensions{
+	mainPaneDimensions := v4{
 		x1: leftPaneDimensions.x2 + 2,
-		y1: 1,
+		y1: 2,
 		x2: leftPaneDimensions.x2 + paneWidth,
 		y2: h - 1,
 	}
-	rightPaneDimensions := paneDimensions{
+	rightPaneDimensions := v4{
 		x1: mainPaneDimensions.x2 + 2,
-		y1: 1,
+		y1: 2,
 		x2: mainPaneDimensions.x2 + paneWidth,
 		y2: h - 1,
 	}
@@ -299,8 +300,16 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 		screen.SetContent(sep2X, i, '|', nil, tcell.StyleDefault)
 	}
 
-	drawText(screen, 0, 0, w, 0, StylePathIndicator, fmt.Sprintf("Parent: %s", currPath))
-	drawText(screen, mainPaneDimensions.x1, 0, w, 0, StylePathIndicator, fmt.Sprintf("Navigating: %s", currPath))
+	drawText(screen, v4{0, 0, w, 0}, StylePathIndicator, fmt.Sprintf("Parent: %s", currPath))
+
+	dimensions := v4{x1: mainPaneDimensions.x1, y1: 0, x2: w, y2: 0}
+	switch currMode {
+    case ModeDefault:
+		drawText(screen, dimensions, StylePathIndicator, fmt.Sprintf("Navigating: %s", currPath))
+	case ModeSearch:
+		content := fmt.Sprintf("Searching: %s/%s", currPath, currSearchEntry)
+		drawText(screen, dimensions, StyleActivePathIndicator, content)
+	}
 
 	parentSelectedIdx := 0
 	parentFiles := []fs.DirEntry{}
@@ -334,11 +343,11 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	drawPane(screen, childFiles, rightPaneDimensions, 0, 0)
 }
 
-type paneDimensions struct {
+type v4 struct {
 	x1, y1, x2, y2 int
 }
 
-func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions paneDimensions, selectedMarker int, scrollMarker int) {
+func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions v4, selectedMarker int, scrollMarker int) {
 	heightUsableForFiles := dimensions.y2 - dimensions.y1
 
 	for i := range heightUsableForFiles {
@@ -361,10 +370,7 @@ func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions paneDimensi
 
 		drawText(
 			screen,
-			dimensions.x1,
-			i+1,
-			dimensions.x2,
-			i+1,
+			v4{x1: dimensions.x1, y1: dimensions.y1+i, x2: dimensions.x2, y2: dimensions.y1+i},
 			style,
 			fmt.Sprintf("%s%s", prefix, file.Name()),
 		)
@@ -373,28 +379,30 @@ func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions paneDimensi
 
 func drawInfoLine(screen tcell.Screen) {
 	w, h := screen.Size()
+	dimensions := v4{0, h-1, w, h-1}
 	helpStyle := tcell.StyleDefault.Foreground(tcell.ColorYellow)
-	drawText(screen, 0, h-1, w, h-1, helpStyle, "(j/k: up/down) (l: enter) (h: parent) (. hidden) (q: quit)")
+	drawText(
+		screen,
+		dimensions,
+		helpStyle,
+		"(j/k: up/down) (l: enter) (h: parent) (. hidden) (q: quit)",
+	)
 }
 
-func drawSearchLine(screen tcell.Screen, searchEntry string) {
-	w, h := screen.Size()
-	searchBarStyle := tcell.StyleDefault.Foreground(tcell.ColorYellow)
-	drawText(screen, 0, h-1, w, h-1, searchBarStyle, fmt.Sprintf("/%s", searchEntry))
-}
 
-func drawText(screen tcell.Screen, x1, y1, x2, y2 int, style tcell.Style, text string) {
-	currCol := x1
-	currRow := y1
+
+func drawText(screen tcell.Screen, dimensions v4, style tcell.Style, text string) {
+	currCol := dimensions.x1
+	currRow := dimensions.y1
 
 	for _, r := range text {
 		screen.SetContent(currCol, currRow, r, nil, style)
 		currCol++
-		if currCol >= x2 {
+		if currCol >= dimensions.x2 {
 			currRow++
-			currCol = x1
+			currCol = dimensions.x1
 		}
-		if currRow > y2 {
+		if currRow > dimensions.y2 {
 			break
 		}
 	}
@@ -424,7 +432,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 
 			selectedIdx = (selectedIdx + 1) % len(files)
 			_, screenHeight := screen.Size()
-			heightUsableForFiles := max(screenHeight-2, 1)
+			heightUsableForFiles := max(screenHeight-3, 1) // TODO: Store pane info elsewhere. That would remove this magic 3.
 
 			scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
 
@@ -435,7 +443,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 
 			selectedIdx = (selectedIdx - 1 + len(files)) % len(files)
 			_, screenHeight := screen.Size()
-			heightUsableForFiles := max(screenHeight-2, 1)
+			heightUsableForFiles := max(screenHeight-3, 1)
 
 			scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
 
@@ -610,18 +618,29 @@ func render(keyChanges chan *tcell.EventKey, config *conf.Config) {
 
 		logger.Debug("render: processing...", "keyRune", eventKey.Rune(), "keyString", string(eventKey.Rune()), "currMode", currMode, "selectedIdx", selectedIdx)
 
+		triggerDraw := func() {
+			drawFileList(screen, config)
+			drawInfoLine(screen)
+			screen.Show()
+		}
+
 		switch currMode {
 		case ModeDefault:
-			if keyRune == 'h' || keyRune == 'j' || keyRune == 'k' || keyRune == 'l' || keyRune == '.' || key == tcell.KeyBackspace || key == tcell.KeyCR || key == tcell.KeyTAB {
-				drawFileList(screen, config)
-				drawInfoLine(screen)
-				screen.Show()
+			shouldTriggerRedraw := keyRune == 'h' ||
+				keyRune == 'j' ||
+				keyRune == 'k' ||
+				keyRune == 'l' ||
+				keyRune == '.' ||
+				key == tcell.KeyBackspace ||
+				key == tcell.KeyCR ||
+				key == tcell.KeyTAB
+
+			if shouldTriggerRedraw {
+				triggerDraw()
 			}
 
 		case ModeSearch:
-			drawFileList(screen, config)
-			drawSearchLine(screen, currSearchEntry)
-			screen.Show()
+			triggerDraw()
 		}
 	}
 }
