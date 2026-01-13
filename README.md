@@ -1,6 +1,6 @@
 # pathsurfer
 
-A tiny terminal utility for navigating through directiories more quickly.
+A tiny terminal utility for navigating through directories more quickly.
 
 > ⚠️ **WARNING**
 >
@@ -97,7 +97,7 @@ install -m 644 ./scripts/psurf.fish ~/.config/fish/conf.d/psurf.fish
 | Search              | /   | Enter search mode           |
 | Toggle hidden files | .   | Toggle hidden files in list |
 | Quit                | q   | Quits the program           |
-| Exit serach         | ESC | Exists out of serach mode   |
+| Exit search         | ESC | Exists out of search mode   |
 
 ## License
 
