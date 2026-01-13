@@ -525,9 +525,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 			currSearchEntry = ""
 
 		case tcell.KeyESC:
-			// Disable search mode and ignore the current search string.
-			currMode = ModeDefault
-			currSearchEntry = ""
+			return keyHandlingResult{shouldQuit: true, newPath: currPath}
 
 		case tcell.KeyTAB:
 			if len(files) == 0 {
