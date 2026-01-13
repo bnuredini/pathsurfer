@@ -271,24 +271,24 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	screen.Clear()
 
 	w, h := screen.Size()
-	paneWidth := w / 3
+	secondaryPaneWidth := w / 6
 
 	leftPaneDimensions := v4{
 		x1: 0,
 		y1: 2,
-		x2: paneWidth,
+		x2: secondaryPaneWidth,
 		y2: h - 1,
 	}
 	mainPaneDimensions := v4{
 		x1: leftPaneDimensions.x2 + 2,
 		y1: 2,
-		x2: leftPaneDimensions.x2 + paneWidth,
+		x2: leftPaneDimensions.x2 + (3*secondaryPaneWidth),
 		y2: h - 1,
 	}
 	rightPaneDimensions := v4{
 		x1: mainPaneDimensions.x2 + 2,
 		y1: 2,
-		x2: mainPaneDimensions.x2 + paneWidth,
+		x2: mainPaneDimensions.x2 + secondaryPaneWidth,
 		y2: h - 1,
 	}
 
@@ -299,8 +299,6 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 		screen.SetContent(sep1X, i, '|', nil, tcell.StyleDefault)
 		screen.SetContent(sep2X, i, '|', nil, tcell.StyleDefault)
 	}
-
-	drawText(screen, v4{0, 0, w, 0}, StylePathIndicator, fmt.Sprintf("Parent: %s", currPath))
 
 	dimensions := v4{x1: mainPaneDimensions.x1, y1: 0, x2: w, y2: 0}
 	switch currMode {
