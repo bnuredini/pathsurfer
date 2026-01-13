@@ -634,7 +634,8 @@ func render(keyChanges chan *tcell.EventKey, config *conf.Config) {
 				keyRune == '.' ||
 				key == tcell.KeyBackspace ||
 				key == tcell.KeyCR ||
-				key == tcell.KeyTAB
+				key == tcell.KeyTAB ||
+				key == tcell.KeyESC
 
 			if shouldTriggerRedraw {
 				triggerDraw()
