@@ -50,7 +50,7 @@ make build
 sudo make install
 ```
 
-If you use bash or zsh, run the following to integrate pathsurfer with your shell:
+If you use bash or zsh, run this command to integrate pathsurfer with your shell:
 
 ```bash
 make install/bash
@@ -97,9 +97,9 @@ install -m 644 ./scripts/psurf.fish ~/.config/fish/conf.d/psurf.fish
 | Search              | /   | Enter search mode           |
 | Toggle hidden files | .   | Toggle hidden files in list |
 | Quit                | q   | Quits the program           |
+| Exit serach         | ESC | Exists out of serach mode   |
 
 ## License
 
 This project is released under the MIT license. For more information, see the 
 [LICENSE](./LICENSE) file.
-
