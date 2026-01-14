@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"slices"
 	"fmt"
 	"io/fs"
 	"log"
@@ -17,6 +18,17 @@ import (
 
 	"github.com/bnuredini/pathsurfer/internal/conf"
 	"github.com/bnuredini/pathsurfer/internal/fuzzy"
+)
+
+type v4 struct {
+	x1, y1, x2, y2 int
+}
+
+type Mode int
+
+const (
+	ModeDefault Mode = iota
+	ModeSearch
 )
 
 // TODO: Clean-up these global variables.
@@ -43,17 +55,28 @@ var (
 	selectedIdx        int
 )
 
-type Mode int
-
-const (
-	ModeDefault Mode = iota
-	ModeSearch
-)
-
 var (
 	StylePathIndicator = tcell.StyleDefault.Foreground(tcell.ColorGray)
 	StyleActivePathIndicator = tcell.StyleDefault.Foreground(tcell.ColorBlue)
+	StyleReset = tcell.StyleDefault.Background(tcell.ColorReset).Foreground(tcell.ColorReset)
+	StyleError = tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(tcell.ColorDarkRed)
+	StyleInfo = tcell.StyleDefault.Foreground(tcell.ColorYellow)
 )
+
+var RunesThatTriggerRedrawInDefault = []rune{
+	'h',
+	'j',
+	'k',
+	'l',
+	'.',
+}
+
+var KeysThatTriggerRedrawInDefault = []tcell.Key{
+	tcell.KeyBackspace,
+	tcell.KeyCR,
+	tcell.KeyTAB,
+	tcell.KeyESC,
+}
 
 func main() {
 	config, err := conf.Init()
@@ -148,17 +171,18 @@ func main() {
 		os.Exit(0)
 	}()
 
-	screen.SetStyle(tcell.StyleDefault.Background(tcell.ColorReset).Foreground(tcell.ColorReset))
+	screen.SetStyle(StyleReset)
 	screen.Clear()
 
-	finalPathToCd := ""
+	pathToPrint := ""
 	positionHistory = make(map[string]int)
 
 	updateFileListingsUsingPath(currPath, config)
 	drawFileList(screen, config)
 
 	keyEnteredCh := make(chan *tcell.EventKey)
-	go render(keyEnteredCh, config)
+	errorCh := make(chan error)
+	go render(keyEnteredCh, errorCh, config)
 
 MainLoop:
 	for {
@@ -170,21 +194,25 @@ MainLoop:
 			drawFileList(screen, config)
 
 		case *tcell.EventKey:
-			result := handleKeyPress(ev, config)
+			result, err := handleKeyPress(ev, config)
 			if result.shouldQuit {
-				finalPathToCd = result.newPath
+				pathToPrint = result.newPath
 				break MainLoop
 			}
 
-			keyEnteredCh <- ev
+			if err != nil {
+				errorCh <- err
+			} else {
+				keyEnteredCh <- ev
+			}
 		}
 	}
 
 	// Assuming that the user is using one of the wrapper scripts (psurf.sh or
-	// psurf.fish), this program will print the current directory and the wrapper
-	// will change the directory to it.
-	if finalPathToCd != "" {
-		fmt.Println(finalPathToCd)
+	// psurf.fish), this program will print the current directory and the
+	// wrapper will change the shell's directory to what gets printed here.
+	if pathToPrint != "" {
+		fmt.Println(pathToPrint)
 	}
 }
 
@@ -341,10 +369,6 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	drawPane(screen, childFiles, rightPaneDimensions, 0, 0)
 }
 
-type v4 struct {
-	x1, y1, x2, y2 int
-}
-
 func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions v4, selectedMarker int, scrollMarker int) {
 	heightUsableForFiles := dimensions.y2 - dimensions.y1
 
@@ -378,12 +402,22 @@ func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions v4, selecte
 func drawInfoLine(screen tcell.Screen) {
 	w, h := screen.Size()
 	dimensions := v4{0, h-1, w, h-1}
-	helpStyle := tcell.StyleDefault.Foreground(tcell.ColorYellow)
 	drawText(
 		screen,
 		dimensions,
-		helpStyle,
+		StyleInfo,
 		"(j/k: up/down) (l: enter) (h: parent) (. hidden) (q: quit)",
+	)
+}
+
+func drawErrorLine(screen tcell.Screen, err error) {
+	w, h := screen.Size()
+	dimensions := v4{0, h-1, w, h-1}
+	drawText(
+		screen,
+		dimensions,
+		StyleError,
+		err.Error(),
 	)
 }
 
@@ -409,17 +443,17 @@ type keyHandlingResult struct {
 	newPath    string
 }
 
-func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
+func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
 	// Some terminals deliver Ctrl+C as \x03. Code point 3 is the ASCII ETX
 	// control character.
 	if ev.Key() == tcell.KeyCtrlC || ev.Rune() == 3 {
-		return keyHandlingResult{shouldQuit: true, newPath: currPath}
+		return keyHandlingResult{shouldQuit: true, newPath: currPath}, nil
 	}
 
 	if currMode == ModeDefault && ev.Key() == tcell.KeyRune {
 		switch ev.Rune() {
 		case 'q':
-			return keyHandlingResult{shouldQuit: true, newPath: currPath}
+			return keyHandlingResult{shouldQuit: true, newPath: currPath}, nil
 
 		case 'j':
 			if len(files) == 0 {
@@ -485,7 +519,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 
 		case '/':
 			currMode = ModeSearch
-			return keyHandlingResult{shouldQuit: false, newPath: ""}
+			return keyHandlingResult{shouldQuit: false, newPath: ""}, nil
 		}
 	}
 
@@ -493,7 +527,11 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 		switch ev.Key() {
 		case tcell.KeyRune:
 			currSearchEntry = currSearchEntry + string(ev.Rune())
-			matches, _ := searchInDir(currSearchEntry, files) // TODO: Handle the error from search.
+			matches, err := searchInDir(currSearchEntry, files)
+			if err != nil {
+				return keyHandlingResult{}, err
+			}
+
 			updateFileListings(matches, config)
 
 		case tcell.KeyBackspace, 127:
@@ -503,7 +541,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 
 			currDirFiles, err := os.ReadDir(currPath)
 			if err != nil {
-				log.Fatalf("Failed to read path %q", currPath)
+				return keyHandlingResult{}, err
 			}
 
 			if len(currSearchEntry) == 1 {
@@ -559,7 +597,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) keyHandlingResult {
 		}
 	}
 
-	return keyHandlingResult{shouldQuit: false, newPath: ""}
+	return keyHandlingResult{shouldQuit: false, newPath: ""}, nil
 }
 
 // TODO: Wrapping is buggy right now. Try wrapping in a directory with a lot of files.
@@ -609,38 +647,28 @@ func searchInDir(pattern string, candidateFiles []fs.DirEntry) ([]fs.DirEntry, e
 	return result, nil
 }
 
-func render(keyChanges chan *tcell.EventKey, config *conf.Config) {
+func render(keyChangesCh chan *tcell.EventKey, errorCh chan error, config *conf.Config) {
 	for {
-		eventKey := <-keyChanges
-		keyRune := eventKey.Rune()
-		key := eventKey.Key()
+		select {
+		case  eventKey := <-keyChangesCh:
+			keyRune := eventKey.Rune()
+			key := eventKey.Key()
 
-		logger.Debug("render: processing...", "keyRune", eventKey.Rune(), "keyString", string(eventKey.Rune()), "currMode", currMode, "selectedIdx", selectedIdx)
+			logger.Debug("render: processing...", "keyRune", eventKey.Rune(), "keyString", string(eventKey.Rune()), "currMode", currMode, "selectedIdx", selectedIdx)
 
-		triggerDraw := func() {
-			drawFileList(screen, config)
-			drawInfoLine(screen)
-			screen.Show()
-		}
+			shouldRedrawInDefault :=
+				slices.Contains(RunesThatTriggerRedrawInDefault, keyRune) ||
+				slices.Contains(KeysThatTriggerRedrawInDefault, key)
 
-		switch currMode {
-		case ModeDefault:
-			shouldTriggerRedraw := keyRune == 'h' ||
-				keyRune == 'j' ||
-				keyRune == 'k' ||
-				keyRune == 'l' ||
-				keyRune == '.' ||
-				key == tcell.KeyBackspace ||
-				key == tcell.KeyCR ||
-				key == tcell.KeyTAB ||
-				key == tcell.KeyESC
-
-			if shouldTriggerRedraw {
-				triggerDraw()
+			if (currMode == ModeDefault || shouldRedrawInDefault) || currMode == ModeSearch {
+				drawFileList(screen, config)
+				drawInfoLine(screen)
+				screen.Show()
 			}
 
-		case ModeSearch:
-			triggerDraw()
+		case err := <-errorCh:
+			drawErrorLine(screen, err)
+			screen.Show()
 		}
 	}
 }
