@@ -179,6 +179,7 @@ func main() {
 
 	updateFileListingsUsingPath(currPath, config)
 	drawFileList(screen, config)
+	drawInfoLine(screen)
 
 	keyEnteredCh := make(chan *tcell.EventKey)
 	errorCh := make(chan error)
