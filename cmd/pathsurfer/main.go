@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"slices"
 	"fmt"
 	"io/fs"
 	"log"
@@ -10,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"syscall"
@@ -31,8 +31,9 @@ const (
 	ModeSearch
 )
 
-// TODO: Clean-up these global variables.
-
+// CLEANUP: Remove these global variables. Split them in separate struct types.
+// Introduce different modules for different responsibilities: UI, user input,
+// file management/parsing.
 var (
 	screen tcell.Screen
 	logger *slog.Logger
@@ -56,11 +57,11 @@ var (
 )
 
 var (
-	StylePathIndicator = tcell.StyleDefault.Foreground(tcell.ColorGray)
+	StylePathIndicator       = tcell.StyleDefault.Foreground(tcell.ColorGray)
 	StyleActivePathIndicator = tcell.StyleDefault.Foreground(tcell.ColorBlue)
-	StyleReset = tcell.StyleDefault.Background(tcell.ColorReset).Foreground(tcell.ColorReset)
-	StyleError = tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(tcell.ColorDarkRed)
-	StyleInfo = tcell.StyleDefault.Foreground(tcell.ColorYellow)
+	StyleReset               = tcell.StyleDefault.Background(tcell.ColorReset).Foreground(tcell.ColorReset)
+	StyleError               = tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(tcell.ColorDarkRed)
+	StyleInfo                = tcell.StyleDefault.Foreground(tcell.ColorYellow)
 )
 
 var RunesThatTriggerRedrawInDefault = []rune{
@@ -158,7 +159,6 @@ func main() {
 		logger.Error("Couldn't initialize screen", "err", err)
 		os.Exit(1)
 	}
-	defer screen.Fini()
 
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
@@ -185,8 +185,8 @@ func main() {
 	errorCh := make(chan error)
 	go render(keyEnteredCh, errorCh, config)
 
-MainLoop:
-	for {
+	running := true
+	for running {
 		ev := screen.PollEvent()
 
 		switch ev := ev.(type) {
@@ -198,7 +198,8 @@ MainLoop:
 			result, err := handleKeyPress(ev, config)
 			if result.shouldQuit {
 				pathToPrint = result.newPath
-				break MainLoop
+				running = false
+				break
 			}
 
 			if err != nil {
@@ -208,6 +209,8 @@ MainLoop:
 			}
 		}
 	}
+
+	screen.Fini()
 
 	// Assuming that the user is using one of the wrapper scripts (psurf.sh or
 	// psurf.fish), this program will print the current directory and the
@@ -250,6 +253,8 @@ func getFilteredDirEntires(path string, config *conf.Config) []fs.DirEntry {
 	return result
 }
 
+// CLEANUP: This function updates too many state variables. Ideally, it should
+// only touch the file listings.
 func updateFileListings(rawFiles []fs.DirEntry, config *conf.Config) {
 	if config.ShowHiddenFiles {
 		files = rawFiles
@@ -311,7 +316,7 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	mainPaneDimensions := v4{
 		x1: leftPaneDimensions.x2 + 2,
 		y1: 2,
-		x2: leftPaneDimensions.x2 + (3*secondaryPaneWidth),
+		x2: leftPaneDimensions.x2 + (3 * secondaryPaneWidth),
 		y2: h - 1,
 	}
 	rightPaneDimensions := v4{
@@ -331,7 +336,7 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 
 	dimensions := v4{x1: mainPaneDimensions.x1, y1: 0, x2: w, y2: 0}
 	switch currMode {
-    case ModeDefault:
+	case ModeDefault:
 		drawText(screen, dimensions, StylePathIndicator, fmt.Sprintf("Navigating: %s", currPath))
 	case ModeSearch:
 		content := fmt.Sprintf("Searching: %s/%s", currPath, currSearchEntry)
@@ -393,7 +398,7 @@ func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions v4, selecte
 
 		drawText(
 			screen,
-			v4{x1: dimensions.x1, y1: dimensions.y1+i, x2: dimensions.x2, y2: dimensions.y1+i},
+			v4{x1: dimensions.x1, y1: dimensions.y1 + i, x2: dimensions.x2, y2: dimensions.y1 + i},
 			style,
 			fmt.Sprintf("%s%s", prefix, file.Name()),
 		)
@@ -402,7 +407,7 @@ func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions v4, selecte
 
 func drawInfoLine(screen tcell.Screen) {
 	w, h := screen.Size()
-	dimensions := v4{0, h-1, w, h-1}
+	dimensions := v4{0, h - 1, w, h - 1}
 	drawText(
 		screen,
 		dimensions,
@@ -413,7 +418,7 @@ func drawInfoLine(screen tcell.Screen) {
 
 func drawErrorLine(screen tcell.Screen, err error) {
 	w, h := screen.Size()
-	dimensions := v4{0, h-1, w, h-1}
+	dimensions := v4{0, h - 1, w, h - 1}
 	drawText(
 		screen,
 		dimensions,
@@ -601,7 +606,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult,
 	return keyHandlingResult{shouldQuit: false, newPath: ""}, nil
 }
 
-// TODO: Wrapping is buggy right now. Try wrapping in a directory with a lot of files.
+// BUG: Wrapping is buggy right now. Try wrapping in a directory with a lot of files.
 func calculateScrollOffset(selectedIdx, currScrollOffset, heightUsableForFiles, listLen int) int {
 	result := 0
 
@@ -651,7 +656,7 @@ func searchInDir(pattern string, candidateFiles []fs.DirEntry) ([]fs.DirEntry, e
 func render(keyChangesCh chan *tcell.EventKey, errorCh chan error, config *conf.Config) {
 	for {
 		select {
-		case  eventKey := <-keyChangesCh:
+		case eventKey := <-keyChangesCh:
 			keyRune := eventKey.Rune()
 			key := eventKey.Key()
 
@@ -659,7 +664,7 @@ func render(keyChangesCh chan *tcell.EventKey, errorCh chan error, config *conf.
 
 			shouldRedrawInDefault :=
 				slices.Contains(RunesThatTriggerRedrawInDefault, keyRune) ||
-				slices.Contains(KeysThatTriggerRedrawInDefault, key)
+					slices.Contains(KeysThatTriggerRedrawInDefault, key)
 
 			if (currMode == ModeDefault || shouldRedrawInDefault) || currMode == ModeSearch {
 				drawFileList(screen, config)
