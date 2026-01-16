@@ -412,7 +412,7 @@ func drawInfoLine(screen tcell.Screen) {
 		screen,
 		dimensions,
 		StyleInfo,
-		"(j/k: up/down) (l: enter) (h: parent) (. hidden) (q: quit)",
+		"(j/k: up/down) (l: enter) (h: parent) (/: search) (. hidden) (q: quit)",
 	)
 }
 
