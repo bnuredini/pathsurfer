@@ -1,7 +1,7 @@
 #!/usr/bin/env fish
 
 function psurf
-    set app_path "/usr/bin/pathsurfer"
+    set app_path "/usr/local/bin/pathsurfer"
     
     if not test -x "$app_path"
         echo "error: pathsurfer not found or isn't executable at $app_path"
