@@ -36,11 +36,13 @@ install/fish:
 	mkdir -p $(script_install_dir_for_fish)
 	install -m 644 scripts/psurf.fish $(script_install_dir_for_fish)
 	install -m 644 scripts/psurf_keybindings.fish $(script_install_dir_for_fish)
-	@echo -e "\nInstallation complete. Run the following commands or restart your shell to use psurf:\n"
-	@echo -e '```'
-	@echo -e "source $(script_install_dir_for_fish)/psurf.fish"
-	@echo -e "source $(script_install_dir_for_fish)/psurf_keybindings.fish"
-	@echo -e '```'
+	@echo ""
+	@echo "Installation complete. Run the following commands or restart your shell to use psurf:"
+	@echo ""
+	@echo '```'
+	@echo "source $(script_install_dir_for_fish)/psurf.fish"
+	@echo "source $(script_install_dir_for_fish)/psurf_keybindings.fish"
+	@echo '```'
 
 ## install/bash: install the binary stored in <project-path>/bin/ for bash
 .PHONY: install/bash
@@ -53,7 +55,8 @@ install/bash:
 	@grep -qxF "source $(script_install_dir)/psurf.sh" $(bashrc) || \
 	{ echo ""; echo "# Load the psurf shell function"; echo "source $(script_install_dir)/psurf.sh"; } >> $(bashrc)
 
-	@echo -e "\nInstallation complete. Run 'source $(bashrc)' or restart your shell to use psurf."
+	@echo ""
+	@echo "Installation complete. Run 'source $(bashrc)' or restart your shell to use psurf."
 
 ## install/zsh: install the binary stored in <project-path>/bin/ for zsh
 .PHONY: install/zsh
@@ -66,7 +69,7 @@ install/zsh:
 	@grep -qxF "source $(script_install_dir)/psurf.sh" $(zshrc) || \
 	{ echo ""; echo "# Load the psurf shell function"; echo "source $(script_install_dir)/psurf.sh"; } >> $(zshrc)
 
-	@echo -e "\nInstallation complete. Run 'source $(zshrc)' or restart your shell to use psurf."
+	@printf "\nInstallation complete. Run 'source $(zshrc)' or restart your shell to use psurf."
 
 ## uninstall: remove the application
 .PHONY: uninstall
@@ -81,7 +84,7 @@ uninstall/fish:
 	@echo "Removing $(script_install_dir_for_fish)/psurf.fish..."
 	rm -f $(script_install_dir_for_fish)/psurf.fish
 	rm -f $(script_install_dir_for_fish)/psurf_keybindings.fish
-	@echo -e "\nUninstallation completed. Close your shell session and open it back again."
+	@printf "\nUninstallation completed. Close your shell session and open it back again."
 
 ## uninstall/bash: remove the psurf shell script for bash
 .PHONY: uninstall/bash
@@ -90,7 +93,7 @@ uninstall/bash:
 	rm -f $(script_install_dir)/psurf.sh
 	sed -i '\|# Load psurf shell function|d' $(bashrc) || true
 	sed -i '\|source $(script_install_dir)/psurf.sh|d' $(bashrc) || true
-	@echo -e "\nUninstallation completed. Close your shell session and open it back again."
+	@printf "\nUninstallation completed. Close your shell session and open it back again."
 
 ## uninstall/zsh: remove the psurf shell script for zsh
 .PHONY: uninstall/zsh
@@ -99,7 +102,7 @@ uninstall/zsh:
 	rm -f $(script_install_dir)/psurf.sh
 	sed -i '\|# Load psurf shell function|d' $(zshrc) || true
 	sed -i '\|source $(script_install_dir)/psurf.sh|d' $(zshrc) || true
-	@echo -e "\nUninstallation completed. Close your shell session and open it back again."
+	@printf "\nUninstallation completed. Close your shell session and open it back again."
 
 ## run: run the binary
 .PHONY: run
