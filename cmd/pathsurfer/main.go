@@ -569,6 +569,10 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult,
 				updateFileListings(currDirFiles, config)
 			}
 
+			if len(files) == 0 {
+				updateFileListingsUsingPath(currPath, config)
+			}
+
 			currMode = ModeDefault
 			currSearchEntry = ""
 
