@@ -577,6 +577,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult,
 			// consistent with how searching work in Vim.
 			currMode = ModeDefault
 			currSearchEntry = ""
+			updateFileListingsUsingPath(currPath, config)
 
 		case tcell.KeyTAB:
 			if len(files) == 0 {
