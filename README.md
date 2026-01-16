@@ -74,7 +74,7 @@ go build ./cmd/pathsurfer
 sudo install -m 644 ./pathsurfer /usr/bin/pathsurfer
 ```
 
-If you use bash, add this line to your `.bashrc`:
+If you use bash or zsh, add this line to your `.bashrc`/`.zshrc`:
 
 ```bash
 source <path-to-this-repo>/scripts/psurf.sh
