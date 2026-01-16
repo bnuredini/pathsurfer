@@ -11,7 +11,7 @@ curr_time = $(shell date --iso-8601=seconds)
 git_description = $(shell git describe --always --dirty)
 linker_flags = '-s -X github.com/bnuredini/pathsurfer/internal/conf.buildTime=${curr_time} -X github.com/bnuredini/pathsurfer/internal/conf.version=${git_description}'
 
-install_path = /usr/bin/pathsurfer
+install_path = /usr/local/bin/pathsurfer
 script_install_dir_for_fish = $(HOME)/.config/fish/conf.d
 script_install_dir = $(HOME)/.local/share/pathsurfer/functions
 bashrc = $(HOME)/.bashrc
@@ -32,11 +32,15 @@ install:
 ## install/fish: install the binary stored in <project-path>/bin/ for fish
 .PHONY: install/fish
 install/fish:
-	@echo "Installing psurf scripts to $(script_install_dir_for_fish)/psurf.fish"
+	@echo "Installing psurf scripts to $(script_install_dir_for_fish)/psurf.fish..."
 	mkdir -p $(script_install_dir_for_fish)
 	install -m 644 scripts/psurf.fish $(script_install_dir_for_fish)
 	install -m 644 scripts/psurf_keybindings.fish $(script_install_dir_for_fish)
-	@echo -e "\nInstallation complete. Run 'source $(script_install_dir_for_fish)/psurf.fish' or restart your shell to use psurf."
+	@echo -e "\nInstallation complete. Run the following commands or restart your shell to use psurf:\n"
+	@echo -e '```'
+	@echo -e "source $(script_install_dir_for_fish)/psurf.fish"
+	@echo -e "source $(script_install_dir_for_fish)/psurf_keybindings.fish"
+	@echo -e '```'
 
 ## install/bash: install the binary stored in <project-path>/bin/ for bash
 .PHONY: install/bash
@@ -76,7 +80,8 @@ uninstall:
 uninstall/fish:
 	@echo "Removing $(script_install_dir_for_fish)/psurf.fish..."
 	rm -f $(script_install_dir_for_fish)/psurf.fish
-	@echo -e "\nUninstallation completed"
+	rm -f $(script_install_dir_for_fish)/psurf_keybindings.fish
+	@echo -e "\nUninstallation completed. Close your shell session and open it back again."
 
 ## uninstall/bash: remove the psurf shell script for bash
 .PHONY: uninstall/bash
@@ -85,7 +90,7 @@ uninstall/bash:
 	rm -f $(script_install_dir)/psurf.sh
 	sed -i '\|# Load psurf shell function|d' $(bashrc) || true
 	sed -i '\|source $(script_install_dir)/psurf.sh|d' $(bashrc) || true
-	@echo -e "\nUninstallation completed"
+	@echo -e "\nUninstallation completed. Close your shell session and open it back again."
 
 ## uninstall/zsh: remove the psurf shell script for zsh
 .PHONY: uninstall/zsh
@@ -94,7 +99,7 @@ uninstall/zsh:
 	rm -f $(script_install_dir)/psurf.sh
 	sed -i '\|# Load psurf shell function|d' $(zshrc) || true
 	sed -i '\|source $(script_install_dir)/psurf.sh|d' $(zshrc) || true
-	@echo -e "\nUninstallation completed"
+	@echo -e "\nUninstallation completed. Close your shell session and open it back again."
 
 ## run: run the binary
 .PHONY: run
