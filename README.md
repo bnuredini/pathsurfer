@@ -88,16 +88,16 @@ install -m 644 ./scripts/psurf.fish ~/.config/fish/conf.d/psurf.fish
 
 ## Keybindings
 
-| Action              | Key | Description                 |
-|---------------------|-----|-----------------------------|
-| Move up             | k   | Move up in the file list    |
-| Move down           | j   | Move down in the file list  |
-| Go back             | h   | Go back one directory       |
-| Go forward          | l   | Change into a directory     |
-| Search              | /   | Enter search mode           |
-| Toggle hidden files | .   | Toggle hidden files in list |
-| Quit                | q   | Quits the program           |
-| Exit search         | ESC | Exists out of search mode   |
+| Action              | Key            | Description                 |
+|---------------------|----------------|-----------------------------|
+| Move up             | <kbd>k</kbd>   | Move up in the file list    |
+| Move down           | <kbd>j</kbd>   | Move down in the file list  |
+| Go back             | <kbd>h</kbd>   | Go back one directory       |
+| Go forward          | <kbd>l</kbd>   | Change into a directory     |
+| Search              | <kbd>/</kbd>   | Enter search mode           |
+| Toggle hidden files | <kbd>.</kbd>   | Toggle hidden files in list |
+| Quit                | <kbd>q</kbd>   | Quits the program           |
+| Exit search         | <kbd>ESC</kbd> | Exists out of search mode   |
 
 ## License
 
