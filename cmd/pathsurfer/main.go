@@ -412,7 +412,7 @@ func drawInfoLine(screen tcell.Screen) {
 		screen,
 		dimensions,
 		StyleInfo,
-		"(j/k: up/down) (l: enter) (h: parent) (. hidden) (q: quit)",
+		"(j/k: up/down) (l: enter) (h: parent) (/: search) (. hidden) (q: quit)",
 	)
 }
 
@@ -569,6 +569,10 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult,
 				updateFileListings(currDirFiles, config)
 			}
 
+			if len(files) == 0 {
+				updateFileListingsUsingPath(currPath, config)
+			}
+
 			currMode = ModeDefault
 			currSearchEntry = ""
 
@@ -577,6 +581,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult,
 			// consistent with how searching work in Vim.
 			currMode = ModeDefault
 			currSearchEntry = ""
+			updateFileListingsUsingPath(currPath, config)
 
 		case tcell.KeyTAB:
 			if len(files) == 0 {
