@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -29,11 +31,15 @@ type Mode int
 const (
 	ModeDefault Mode = iota
 	ModeSearch
+	ModeRecordingMark
+	ModeListeningForMark
 )
 
 // CLEANUP: Remove these global variables. Split them in separate struct types.
 // Introduce different modules for different responsibilities: UI, user input,
 // file management/parsing.
+//
+// Follow a simple: Model -> Render -> Update.
 var (
 	screen tcell.Screen
 	logger *slog.Logger
@@ -54,6 +60,8 @@ var (
 	scrollOffset       int
 	parentScrollOffset int
 	selectedIdx        int
+
+	marks map[rune]string
 )
 
 var (
@@ -160,10 +168,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		<-signalCh
+		<-signalChan
 		screen.Fini()
 		if logFile != nil {
 			_ = logFile.Close()
@@ -177,13 +185,18 @@ func main() {
 	pathToPrint := ""
 	positionHistory = make(map[string]int)
 
+	marks, err = readMarks(config)
+	if err != nil {
+		// INCOMPLETE: Provide better information here.
+		log.Fatalf("Failed to read marks: %v", err)
+	}
 	updateFileListingsUsingPath(currPath, config)
 	drawFileList(screen, config)
 	drawInfoLine(screen)
 
-	keyEnteredCh := make(chan *tcell.EventKey)
-	errorCh := make(chan error)
-	go render(keyEnteredCh, errorCh, config)
+	keyEnteredChan := make(chan *tcell.EventKey)
+	errorChan := make(chan error)
+	go render(keyEnteredChan, errorChan, config)
 
 	running := true
 	for running {
@@ -202,10 +215,14 @@ func main() {
 				break
 			}
 
+			if result.addingNewMark {
+				marks, err = readMarks(config)
+			}
+
 			if err != nil {
-				errorCh <- err
+				errorChan <- err
 			} else {
-				keyEnteredCh <- ev
+				keyEnteredChan <- ev
 			}
 		}
 	}
@@ -427,6 +444,23 @@ func drawErrorLine(screen tcell.Screen, err error) {
 	)
 }
 
+func drawMarkHintSection(screen tcell.Screen, config *conf.Config) {
+	w, h := screen.Size()
+
+	idx := 0
+	for entry, value := range marks {
+		dimensions := v4{0, (h-1) - idx, w, (h-1) - idx}
+		drawText(
+			screen,
+			dimensions,
+			StyleInfo,
+			fmt.Sprintf("%c\t%s", entry, value),
+		)
+
+		idx++
+	}
+}
+
 func drawText(screen tcell.Screen, dimensions v4, style tcell.Style, text string) {
 	currCol := dimensions.x1
 	currRow := dimensions.y1
@@ -446,67 +480,192 @@ func drawText(screen tcell.Screen, dimensions v4, style tcell.Style, text string
 
 type keyHandlingResult struct {
 	shouldQuit bool
+	addingNewMark bool
 	newPath    string
 }
 
 func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
+	result := keyHandlingResult{shouldQuit: false, newPath: ""}
+
 	// Some terminals deliver Ctrl+C as \x03. Code point 3 is the ASCII ETX
 	// control character.
 	if ev.Key() == tcell.KeyCtrlC || ev.Rune() == 3 {
 		return keyHandlingResult{shouldQuit: true, newPath: currPath}, nil
 	}
 
-	if currMode == ModeDefault && ev.Key() == tcell.KeyRune {
-		switch ev.Rune() {
-		case 'q':
-			return keyHandlingResult{shouldQuit: true, newPath: currPath}, nil
+	var err error
+	if currMode == ModeDefault {
+		result, err = handleKeyPressInDefault(ev, config)
+		if err != nil {
+			return result, err
+		}
+	} else if currMode == ModeSearch {
+		result, err = handleKeyPressInSearch(ev, config)
+		if err != nil {
+			return result, err
+		}
+	} else if currMode == ModeRecordingMark {
+		if ev.Key() != tcell.KeyRune {
+			return result, errors.New("setting mark: value for mark must be a rune")
+		}
 
-		case 'j':
-			if len(files) == 0 {
-				break
+		err := storeNewMark(ev.Rune(), currPath, config)
+		if err != nil {
+			// INCOMPLETE: Handle this error. Put a red error in the bottom line.
+			return result, err
+		}
+
+		currMode = ModeDefault
+		result.addingNewMark = true
+	}
+
+	return result, nil
+}
+
+func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
+	result := keyHandlingResult{shouldQuit: false, newPath: ""}
+
+	switch ev.Rune() {
+	case 'q':
+		return keyHandlingResult{shouldQuit: true, newPath: currPath}, nil
+
+	case 'j':
+		if len(files) == 0 {
+			break
+		}
+
+		selectedIdx = (selectedIdx + 1) % len(files)
+		_, screenHeight := screen.Size()
+		heightUsableForFiles := max(screenHeight-3, 1) // TODO: Store pane info elsewhere. That would remove this magic 3.
+
+		scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
+
+	case 'k':
+		if len(files) == 0 {
+			break
+		}
+
+		selectedIdx = (selectedIdx - 1 + len(files)) % len(files)
+		_, screenHeight := screen.Size()
+		heightUsableForFiles := max(screenHeight-3, 1)
+
+		scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
+
+	case 'h':
+		positionHistory[currPath] = selectedIdx
+
+		oldPath := currPath
+		newPath := filepath.Dir(currPath)
+		currPath = newPath
+
+		idxFromHistory, ok := positionHistory[newPath]
+		if !ok {
+			updateFileListingsUsingPath(currPath, config)
+
+			for i, f := range files {
+				if f.Name() == filepath.Base(oldPath) {
+					selectedIdx = i
+				}
 			}
+		} else {
+			updateFileListingsUsingPath(currPath, config)
+			selectedIdx = idxFromHistory
+		}
 
-			selectedIdx = (selectedIdx + 1) % len(files)
-			_, screenHeight := screen.Size()
-			heightUsableForFiles := max(screenHeight-3, 1) // TODO: Store pane info elsewhere. That would remove this magic 3.
-
-			scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
-
-		case 'k':
-			if len(files) == 0 {
-				break
-			}
-
-			selectedIdx = (selectedIdx - 1 + len(files)) % len(files)
-			_, screenHeight := screen.Size()
-			heightUsableForFiles := max(screenHeight-3, 1)
-
-			scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
-
-		case 'h':
+	case 'l':
+		if selectedIdx < len(files) && files[selectedIdx].IsDir() {
+			parentScrollOffset = scrollOffset
 			positionHistory[currPath] = selectedIdx
 
-			oldPath := currPath
-			newPath := filepath.Dir(currPath)
-			currPath = newPath
+			currPath = filepath.Join(currPath, files[selectedIdx].Name())
+			updateFileListingsUsingPath(currPath, config)
 
-			idxFromHistory, ok := positionHistory[newPath]
-			if !ok {
-				updateFileListingsUsingPath(currPath, config)
-
-				for i, f := range files {
-					if f.Name() == filepath.Base(oldPath) {
-						selectedIdx = i
-					}
-				}
-			} else {
-				updateFileListingsUsingPath(currPath, config)
+			if idxFromHistory, ok := positionHistory[currPath]; ok {
 				selectedIdx = idxFromHistory
+			} else {
+				selectedIdx = 0
+			}
+		}
+
+	case '.':
+		config.ShowHiddenFiles = !config.ShowHiddenFiles
+		updateFileListingsUsingPath(currPath, config)
+
+	case '/':
+		currMode = ModeSearch
+
+	case 'm':
+		currMode = ModeRecordingMark
+
+	case '\'':
+		currMode = ModeListeningForMark
+	}
+
+	return result, nil
+}
+
+func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
+	switch ev.Key() {
+	case tcell.KeyRune:
+		currSearchEntry = currSearchEntry + string(ev.Rune())
+		matches, err := searchInDir(currSearchEntry, files)
+		if err != nil {
+			return keyHandlingResult{}, err
+		}
+
+		updateFileListings(matches, config)
+
+	case tcell.KeyBackspace, 127:
+		if len(currSearchEntry) == 0 {
+			break
+		}
+
+		currDirFiles, err := os.ReadDir(currPath)
+		if err != nil {
+			return keyHandlingResult{}, err
+		}
+
+		if len(currSearchEntry) == 1 {
+			currSearchEntry = ""
+			updateFileListings(currDirFiles, config)
+		} else {
+			currSearchEntry = currSearchEntry[:len(currSearchEntry)-1]
+			matches, _ := searchInDir(currSearchEntry, currDirFiles)
+			updateFileListings(matches, config)
+		}
+
+	case tcell.KeyCR:
+		if currSearchEntry == "" {
+			currDirFiles, err := os.ReadDir(currPath)
+			if err != nil {
+				log.Fatalf("Failed to read path %q", currPath)
 			}
 
-		case 'l':
+			updateFileListings(currDirFiles, config)
+		}
+
+		if len(files) == 0 {
+			updateFileListingsUsingPath(currPath, config)
+		}
+
+		currMode = ModeDefault
+		currSearchEntry = ""
+
+	case tcell.KeyESC:
+		// Disable search mode and ignore the current search string. This is
+		// consistent with how searching work in Vim.
+		currMode = ModeDefault
+		currSearchEntry = ""
+		updateFileListingsUsingPath(currPath, config)
+
+	case tcell.KeyTAB:
+		if len(files) == 0 {
+			break
+		}
+
+		firstMatch := files[0]
+		if firstMatch.IsDir() {
 			if selectedIdx < len(files) && files[selectedIdx].IsDir() {
-				parentScrollOffset = scrollOffset
 				positionHistory[currPath] = selectedIdx
 
 				currPath = filepath.Join(currPath, files[selectedIdx].Name())
@@ -518,97 +677,68 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult,
 					selectedIdx = 0
 				}
 			}
-
-		case '.':
-			config.ShowHiddenFiles = !config.ShowHiddenFiles
-			updateFileListingsUsingPath(currPath, config)
-
-		case '/':
-			currMode = ModeSearch
-			return keyHandlingResult{shouldQuit: false, newPath: ""}, nil
 		}
-	}
 
-	if currMode == ModeSearch {
-		switch ev.Key() {
-		case tcell.KeyRune:
-			currSearchEntry = currSearchEntry + string(ev.Rune())
-			matches, err := searchInDir(currSearchEntry, files)
-			if err != nil {
-				return keyHandlingResult{}, err
-			}
-
-			updateFileListings(matches, config)
-
-		case tcell.KeyBackspace, 127:
-			if len(currSearchEntry) == 0 {
-				break
-			}
-
-			currDirFiles, err := os.ReadDir(currPath)
-			if err != nil {
-				return keyHandlingResult{}, err
-			}
-
-			if len(currSearchEntry) == 1 {
-				currSearchEntry = ""
-				updateFileListings(currDirFiles, config)
-			} else {
-				currSearchEntry = currSearchEntry[:len(currSearchEntry)-1]
-				matches, _ := searchInDir(currSearchEntry, currDirFiles)
-				updateFileListings(matches, config)
-			}
-
-		case tcell.KeyCR:
-			if currSearchEntry == "" {
-				currDirFiles, err := os.ReadDir(currPath)
-				if err != nil {
-					log.Fatalf("Failed to read path %q", currPath)
-				}
-
-				updateFileListings(currDirFiles, config)
-			}
-
-			if len(files) == 0 {
-				updateFileListingsUsingPath(currPath, config)
-			}
-
-			currMode = ModeDefault
-			currSearchEntry = ""
-
-		case tcell.KeyESC:
-			// Disable search mode and ignore the current search string. This is
-			// consistent with how searching work in Vim.
-			currMode = ModeDefault
-			currSearchEntry = ""
-			updateFileListingsUsingPath(currPath, config)
-
-		case tcell.KeyTAB:
-			if len(files) == 0 {
-				break
-			}
-
-			firstMatch := files[0]
-			if firstMatch.IsDir() {
-				if selectedIdx < len(files) && files[selectedIdx].IsDir() {
-					positionHistory[currPath] = selectedIdx
-
-					currPath = filepath.Join(currPath, files[selectedIdx].Name())
-					updateFileListingsUsingPath(currPath, config)
-
-					if idxFromHistory, ok := positionHistory[currPath]; ok {
-						selectedIdx = idxFromHistory
-					} else {
-						selectedIdx = 0
-					}
-				}
-			}
-
-			currSearchEntry = ""
-		}
+		currSearchEntry = ""
 	}
 
 	return keyHandlingResult{shouldQuit: false, newPath: ""}, nil
+}
+
+func storeNewMark(r rune, path string, config *conf.Config) error {
+	// BUG: Check if there's a mark for this rune already.
+
+	f, err := os.OpenFile(config.MarkFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	line := fmt.Sprintf("%c %s\n", r, path)
+	_, err = f.WriteString(line)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func readMarks(config *conf.Config) (map[rune]string, error) {
+	result := make(map[rune]string)
+
+	f, err := os.Open(config.MarkFilePath)
+	if err != nil {
+		return result, err
+	}
+	defer f.Close()
+
+	lineIdx := 0
+	scanner := bufio.NewScanner(f)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, " ")
+		if len(parts) < 2 {
+			msg := fmt.Sprintf("reading marks: line %v contains less than two components", lineIdx+1)
+			return result, errors.New(msg)
+		}
+
+		runes := []rune(parts[0])
+		if len(runes) != 1 {
+			msg := fmt.Sprintf("reading marks: %v is not a valid rune", parts[0])
+			return result, errors.New(msg)
+		}
+
+		r := runes[0]
+		path := parts[1]
+		result[r] = path
+
+		lineIdx++
+	}
+
+	err = scanner.Err()
+
+	return result, err
 }
 
 // BUG: Wrapping is buggy right now. Try wrapping in a directory with a lot of files.
@@ -658,10 +788,10 @@ func searchInDir(pattern string, candidateFiles []fs.DirEntry) ([]fs.DirEntry, e
 	return result, nil
 }
 
-func render(keyChangesCh chan *tcell.EventKey, errorCh chan error, config *conf.Config) {
+func render(keyChangesChan chan *tcell.EventKey, errorChan chan error, config *conf.Config) {
 	for {
 		select {
-		case eventKey := <-keyChangesCh:
+		case eventKey := <-keyChangesChan:
 			keyRune := eventKey.Rune()
 			key := eventKey.Key()
 
@@ -675,9 +805,13 @@ func render(keyChangesCh chan *tcell.EventKey, errorCh chan error, config *conf.
 				drawFileList(screen, config)
 				drawInfoLine(screen)
 				screen.Show()
+			} else if currMode == ModeListeningForMark {
+				drawFileList(screen, config)
+				drawMarkHintSection(screen, config)
+				screen.Show()
 			}
 
-		case err := <-errorCh:
+		case err := <-errorChan:
 			drawErrorLine(screen, err)
 			screen.Show()
 		}

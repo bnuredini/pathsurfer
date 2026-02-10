@@ -16,6 +16,7 @@ var (
 )
 
 var DefaultLogFilePath string
+var DefaultMarkFilePath string
 
 const (
 	ProgramName = "pathsurfer"
@@ -24,6 +25,7 @@ const (
 type Config struct {
 	WriteDebugLogs  bool
 	LogFilePath     string
+	MarkFilePath    string
 	ShowHiddenFiles bool
 }
 
@@ -52,6 +54,13 @@ func Init() (*Config, error) {
 		ProgramName,
 		fmt.Sprintf("%s.log", ProgramName),
 	)
+	DefaultMarkFilePath = filepath.Join(
+		home,
+		".local",
+		"share",
+		ProgramName,
+		fmt.Sprintf("%s.mark", ProgramName),
+	)
 
 	result := &Config{}
 	flag.BoolVar(
@@ -72,6 +81,12 @@ func Init() (*Config, error) {
 		DefaultLogFilePath,
 		"The path of the file used for storing logs",
 	)
+	flag.StringVar(
+		&result.MarkFilePath,
+		"mark-file",
+		DefaultMarkFilePath,
+		"The path of the file used for storing marks",
+	)
 
 	displayVersion := flag.Bool(
 		"version",
@@ -83,6 +98,7 @@ func Init() (*Config, error) {
 		false,
 		"Show help information",
 	)
+
 	flag.Parse()
 
 	if *displayVersion {
