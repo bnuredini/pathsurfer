@@ -26,12 +26,12 @@ func Find(rawPattern string, candidates []string) []Match {
 	result := []Match{}
 	pattern := []rune(rawPattern)
 
-	patternIdx := 0
-	runningBestScore := -1
-	runningMatchIdx := -1
-
 	for _, candidate := range candidates {
 		match := Match{CandidateString: candidate}
+
+		patternIdx := 0
+		runningBestScore := -1
+		runningBestMatchIdx := -1
 
 		var candidatePrev rune
 		var candidatePrevSize int
@@ -45,7 +45,7 @@ func Find(rawPattern string, candidates []string) []Match {
 					score += FirstCharBonus
 				}
 
-				if candidateIdx != 0 && (candidateIdx-1 == runningMatchIdx) {
+				if candidateIdx != 0 && (candidateIdx-1 == runningBestMatchIdx) {
 					score += ConsecutiveBonus
 				}
 
@@ -59,7 +59,7 @@ func Find(rawPattern string, candidates []string) []Match {
 
 				if score > runningBestScore {
 					runningBestScore = score
-					runningMatchIdx = candidateIdx
+					runningBestMatchIdx = candidateIdx
 				}
 			}
 
@@ -76,18 +76,17 @@ func Find(rawPattern string, candidates []string) []Match {
 				patternNext = pattern[patternIdx+1]
 			}
 
-			if equalsIgnoreCase(patternNext, candidateNext) || candidateNext == 0 {
+			// Look ahead and check if the next pattern rune and candidate string rune match. Only
+			// move forward in the pattern if there's a match between the two or if there's nothing
+			// left in the candidate string.
+			if (equalsIgnoreCase(patternNext, candidateNext) && runningBestMatchIdx != -1) || candidateNext == 0 {
 				patternIdx++
 
-				if runningMatchIdx == -1 {
-					break
-				}
-
 				match.Score += runningBestScore
-				match.Indexes = append(match.Indexes, runningMatchIdx)
+				match.Indexes = append(match.Indexes, runningBestMatchIdx)
 
 				runningBestScore = -1
-				runningMatchIdx = -1
+				runningBestMatchIdx = -1
 			}
 
 			candidatePrev = candidateCurr
@@ -97,15 +96,13 @@ func Find(rawPattern string, candidates []string) []Match {
 			candidateCurrSize = candidateNextSize
 		}
 
-		patternIdx = 0
-
 		if len(pattern) != len(match.Indexes) {
 			continue
 		}
 
 		distPenalty := 0
 		for i := 1; i < len(match.Indexes); i++ {
-			distPenalty += match.Indexes[i] - match.Indexes[i-1]
+			distPenalty += (match.Indexes[i] - match.Indexes[i-1]) - 1
 		}
 		match.Score -= distPenalty
 
