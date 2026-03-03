@@ -79,7 +79,7 @@ func Find(rawPattern string, candidates []string) []Match {
 			// Look ahead and check if the next pattern rune and candidate string rune match. Only
 			// move forward in the pattern if there's a match between the two or if there's nothing
 			// left in the candidate string.
-			if (equalsIgnoreCase(patternNext, candidateNext) && runningBestMatchIdx != -1) || candidateNext == 0 {
+			if runningBestMatchIdx != -1 && (equalsIgnoreCase(patternNext, candidateNext) || candidateNext == 0) {
 				patternIdx++
 
 				match.Score += runningBestScore
