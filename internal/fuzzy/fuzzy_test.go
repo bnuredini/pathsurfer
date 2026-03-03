@@ -18,7 +18,18 @@ func TestGeneral(t *testing.T) {
 				Match{
 					CandidateString: "alpha-beta-cents",
 					Indexes:         []int{0, 6, 11},
-					Score:           17,
+					Score:           19,
+				},
+			},
+		},
+		{
+			"ag",
+			[]string{"thing-angle-thing"},
+			[]Match{
+				Match{
+					CandidateString: "thing-angle-thing",
+					Indexes:         []int{6, 8},
+					Score:           11,
 				},
 			},
 		},
