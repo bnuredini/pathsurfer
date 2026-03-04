@@ -70,6 +70,7 @@ var (
 	StyleReset               = tcell.StyleDefault.Background(tcell.ColorReset).Foreground(tcell.ColorReset)
 	StyleError               = tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(tcell.ColorDarkRed)
 	StyleInfo                = tcell.StyleDefault.Foreground(tcell.ColorYellow)
+	StyleSelectedEntry       = tcell.StyleDefault.Background(tcell.ColorDarkBlue).Foreground(tcell.ColorWhite)
 )
 
 var RunesThatTriggerRedrawInDefault = []rune{
@@ -358,6 +359,8 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	case ModeSearch:
 		content := fmt.Sprintf("Searching: %s/%s", currPath, currSearchEntry)
 		drawText(screen, dimensions, StyleActivePathIndicator, content)
+		screen.ShowCursor(dimensions.x2 + 1, dimensions.y1)
+		screen.SetCursorStyle(tcell.CursorStyleBlinkingBlock)
 	}
 
 	parentSelectedIdx := 0
@@ -410,7 +413,7 @@ func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions v4, selecte
 			style = style.Foreground(tcell.ColorGreen)
 		}
 		if fileIdx == selectedMarker {
-			style = style.Background(tcell.ColorDarkGray).Foreground(tcell.ColorWhite)
+			style = StyleSelectedEntry
 		}
 
 		drawText(
