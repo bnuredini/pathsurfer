@@ -6,13 +6,7 @@ A tiny terminal utility for navigating through directories more quickly.
   <img src="https://github.com/bnuredini/pathsurfer/blob/master/docs/imgs/screenshot1.png" alt="pathsurfer screenshot" width="80%">
 </p>
 
-* [Screenshots](#screenshots)
-* [Features](#features)
-* [Platforms](#platforms)
-* [Installing](#installing)
-* [Building locally](#building-locally)
-* [Keybindings](#keybindings)
-* [License](#license)
+---
 
 ## Features
 
@@ -25,12 +19,6 @@ A tiny terminal utility for navigating through directories more quickly.
 * Vi-like keybindings
 * Configurable settings
 * Integration with bash, zsh, and fish to change your current directory
-
-## Platforms
-
-* Linux
-* macOS
-* Planned: Windows
 
 ## Installing
 
