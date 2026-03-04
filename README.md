@@ -2,7 +2,9 @@
 
 A tiny terminal utility for navigating through directories more quickly.
 
-![screenshot1.png](./docs/imgs/screenshot1.png)
+<p align="center">
+  <img src="https://github.com/bnuredini/pathsurfer/blob/master/docs/imgs/screenshot1.png" alt="pathsurfer screenshot" width="80%">
+</p>
 
 * [Screenshots](#screenshots)
 * [Features](#features)
