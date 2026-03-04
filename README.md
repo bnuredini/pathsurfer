@@ -16,8 +16,7 @@ A tiny terminal utility for navigating through directories more quickly.
 
 > ⚠️ **WARNING**
 >
-> This project is in an **early experimental phase**. It's under active development, behavior may
-> change at any time.
+> This is **pre-alpha software**. It's under active development and behavior may change at any time.
 
 * Directory navigation
 * Fuzzy finding
