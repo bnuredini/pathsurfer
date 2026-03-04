@@ -2,10 +2,7 @@
 
 A tiny terminal utility for navigating through directories more quickly.
 
-> ⚠️ **WARNING**
->
-> This project is in an **early experimental phase**. It's under active development, behavior may
-> change at any time.
+![screenshot1.png](./docs/imgs/screenshot1.png)
 
 * [Screenshots](#screenshots)
 * [Features](#features)
@@ -15,11 +12,12 @@ A tiny terminal utility for navigating through directories more quickly.
 * [Keybindings](#keybindings)
 * [License](#license)
 
-## Screenshots
-
-![screenshot1.png](./docs/imgs/screenshot1.png)
-
 ## Features
+
+> ⚠️ **WARNING**
+>
+> This project is in an **early experimental phase**. It's under active development, behavior may
+> change at any time.
 
 * Directory navigation
 * Fuzzy finding
@@ -50,17 +48,12 @@ make build
 sudo make install
 ```
 
-If you use bash or zsh, run this command to integrate pathsurfer with your shell:
+Depending on which shell you use, you might want to run one of the following commands to integrate
+pathsurfer with your shell.
 
-```bash
-make install/bash
-```
-
-If you use fish, run:
-
-```bash
-make install/fish
-```
+* If you use bash, run `make integrate/bash`
+* If you use zsh, run `make integrate/zsh`
+* If you use fish, run `make integrate/fish`
 
 ### Option #2: Building locally with `go`
 
