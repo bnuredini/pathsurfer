@@ -29,9 +29,9 @@ install:
 	install -m 755 $(binary_path) $(install_path)
 	@echo "Installed $(install_path)"
 
-## install/fish: install the binary stored in <project-path>/bin/ for fish
-.PHONY: install/fish
-install/fish:
+## integrate/fish: integrate the binary stored in <project-path>/bin/ for fish
+.PHONY: integrate/fish
+integrate/fish:
 	@echo "Installing psurf scripts to $(script_install_dir_for_fish)/psurf.fish..."
 	mkdir -p $(script_install_dir_for_fish)
 	install -m 644 scripts/psurf.fish $(script_install_dir_for_fish)
@@ -44,9 +44,9 @@ install/fish:
 	@echo "source $(script_install_dir_for_fish)/psurf_keybindings.fish"
 	@echo '```'
 
-## install/bash: install the binary stored in <project-path>/bin/ for bash
-.PHONY: install/bash
-install/bash:
+## integrate/bash: integrate the binary stored in <project-path>/bin/ for bash
+.PHONY: integrate/bash
+integrate/bash:
 	@echo "Installing the psurf script to $(script_install_dir)..."
 	mkdir -p $(script_install_dir)
 	install -m 644 scripts/psurf.sh $(script_install_dir)/psurf.sh
@@ -58,9 +58,9 @@ install/bash:
 	@echo ""
 	@echo "Installation complete. Run 'source $(bashrc)' or restart your shell to use psurf."
 
-## install/zsh: install the binary stored in <project-path>/bin/ for zsh
-.PHONY: install/zsh
-install/zsh:
+## integrate/zsh: integrate the binary stored in <project-path>/bin/ for zsh
+.PHONY: integrate/zsh
+integrate/zsh:
 	@echo "Installing the psurf script to $(script_install_dir)..."
 	mkdir -p $(script_install_dir)
 	install -m 644 scripts/psurf.sh $(script_install_dir)/psurf.sh
