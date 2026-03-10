@@ -191,7 +191,7 @@ func main() {
 		// INCOMPLETE: Provide better information here.
 		log.Fatalf("Failed to read marks: %v", err)
 	}
-	updateFileListingsUsingPath(currPath, config)
+	handleDirectoryChange(currPath, config)
 	drawFileList(screen, config)
 	drawInfoLine(screen)
 
@@ -273,7 +273,21 @@ func getFilteredDirEntires(path string, config *conf.Config) []fs.DirEntry {
 
 // CLEANUP: This function updates too many state variables. Ideally, it should
 // only touch the file listings.
-func updateFileListings(rawFiles []fs.DirEntry, config *conf.Config) {
+func handleFileListingChange(rawFiles []fs.DirEntry, config *conf.Config) {
+	updateFileListing(rawFiles, config)
+	
+	if len(files) == 0 {
+		selectedIdx = 0
+	} else if selectedIdx >= len(files) {
+		selectedIdx = len(files) - 1
+	}
+
+	_, screenHeight := screen.Size()
+	heightUsableForFiles := max(screenHeight-2, 1)
+	scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
+}
+
+func updateFileListing(rawFiles []fs.DirEntry, config *conf.Config) {
 	if config.ShowHiddenFiles {
 		files = rawFiles
 	} else {
@@ -289,19 +303,9 @@ func updateFileListings(rawFiles []fs.DirEntry, config *conf.Config) {
 	sort.Slice(files, func(i, j int) bool {
 		return files[i].Name() < files[j].Name()
 	})
-
-	if len(files) == 0 {
-		selectedIdx = 0
-	} else if selectedIdx >= len(files) {
-		selectedIdx = len(files) - 1
-	}
-
-	_, screenHeight := screen.Size()
-	heightUsableForFiles := max(screenHeight-2, 1)
-	scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
 }
 
-func updateFileListingsUsingPath(path string, config *conf.Config) {
+func handleDirectoryChange(path string, config *conf.Config) {
 	dir, err := os.ReadDir(path)
 	if err != nil {
 		if os.IsPermission(err) {
@@ -316,7 +320,7 @@ func updateFileListingsUsingPath(path string, config *conf.Config) {
 		return // TODO: Return an error here.
 	}
 
-	updateFileListings(dir, config)
+	handleFileListingChange(dir, config)
 }
 
 func drawFileList(screen tcell.Screen, config *conf.Config) {
@@ -389,9 +393,17 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 		childDir := filepath.Join(currPath, files[selectedIdx].Name())
 		childFiles = getFilteredDirEntires(childDir, config)
 	}
+	
 
 	drawPane(screen, parentFiles, leftPaneDimensions, parentSelectedIdx, parentScrollOffset)
-	drawPane(screen, files, mainPaneDimensions, selectedIdx, scrollOffset)
+	if currMode == ModeSearch {
+		// When in search mode, make sure the marker is at the top of the list.
+		// Since the marker should be at the top, the pane should be drawn as if
+		// both the selected index and the scroll offset are 0.
+		drawPane(screen, files, mainPaneDimensions, 0, 0)
+	} else {
+		drawPane(screen, files, mainPaneDimensions, selectedIdx, scrollOffset)
+	}
 	drawPane(screen, childFiles, rightPaneDimensions, 0, 0)
 }
 
@@ -563,7 +575,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 
 		idxFromHistory, ok := positionHistory[newPath]
 		if !ok {
-			updateFileListingsUsingPath(currPath, config)
+			handleDirectoryChange(currPath, config)
 
 			for i, f := range files {
 				if f.Name() == filepath.Base(oldPath) {
@@ -571,7 +583,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 				}
 			}
 		} else {
-			updateFileListingsUsingPath(currPath, config)
+			handleDirectoryChange(currPath, config)
 			selectedIdx = idxFromHistory
 		}
 
@@ -581,7 +593,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 			positionHistory[currPath] = selectedIdx
 
 			currPath = filepath.Join(currPath, files[selectedIdx].Name())
-			updateFileListingsUsingPath(currPath, config)
+			handleDirectoryChange(currPath, config)
 
 			if idxFromHistory, ok := positionHistory[currPath]; ok {
 				selectedIdx = idxFromHistory
@@ -592,7 +604,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 
 	case '.':
 		config.ShowHiddenFiles = !config.ShowHiddenFiles
-		updateFileListingsUsingPath(currPath, config)
+		handleDirectoryChange(currPath, config)
 
 	case '/':
 		currMode = ModeSearch
@@ -616,7 +628,7 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 			return keyHandlingResult{}, err
 		}
 
-		updateFileListings(matches, config)
+		updateFileListing(matches, config)
 
 	case tcell.KeyBackspace, 127:
 		if len(currSearchEntry) == 0 {
@@ -630,11 +642,11 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 
 		if len(currSearchEntry) == 1 {
 			currSearchEntry = ""
-			updateFileListings(currDirFiles, config)
+			handleFileListingChange(currDirFiles, config)
 		} else {
 			currSearchEntry = currSearchEntry[:len(currSearchEntry)-1]
 			matches, _ := searchInDir(currSearchEntry, currDirFiles)
-			updateFileListings(matches, config)
+			updateFileListing(matches, config)
 		}
 
 	case tcell.KeyCR:
@@ -644,22 +656,27 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 				log.Fatalf("Failed to read path %q", currPath)
 			}
 
-			updateFileListings(currDirFiles, config)
+			handleFileListingChange(currDirFiles, config)
 		}
 
 		if len(files) == 0 {
-			updateFileListingsUsingPath(currPath, config)
+			handleDirectoryChange(currPath, config)
 		}
 
 		currMode = ModeDefault
 		currSearchEntry = ""
+		
+		// The user is now done with searching. Set the marker to point to the
+		// first entry.
+		selectedIdx = 0
+		scrollOffset = 0
 
 	case tcell.KeyESC:
 		// Disable search mode and ignore the current search string. This is
 		// consistent with how searching work in Vim.
 		currMode = ModeDefault
 		currSearchEntry = ""
-		updateFileListingsUsingPath(currPath, config)
+		handleDirectoryChange(currPath, config)
 
 	case tcell.KeyTAB:
 		if len(files) == 0 {
@@ -672,7 +689,7 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 				positionHistory[currPath] = selectedIdx
 
 				currPath = filepath.Join(currPath, files[selectedIdx].Name())
-				updateFileListingsUsingPath(currPath, config)
+				handleDirectoryChange(currPath, config)
 
 				if idxFromHistory, ok := positionHistory[currPath]; ok {
 					selectedIdx = idxFromHistory
