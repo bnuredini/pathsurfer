@@ -700,6 +700,14 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 		}
 
 		currSearchEntry = ""
+		
+	case tcell.KeyBacktab:
+		parentPath := filepath.Dir(filepath.Clean(currPath))
+		if currPath != parentPath {
+			currPath = parentPath
+		}
+		
+		handleDirectoryChange(currPath, config)
 	}
 
 	return keyHandlingResult{shouldQuit: false, newPath: ""}, nil
