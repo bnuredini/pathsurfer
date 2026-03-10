@@ -2,6 +2,7 @@ package fuzzy
 
 import (
 	"unicode"
+	"sort"
 	"unicode/utf8"
 )
 
@@ -108,6 +109,10 @@ func Find(rawPattern string, candidates []string) []Match {
 
 		result = append(result, match)
 	}
+	
+	sort.Slice(result, func(x, y int) bool {
+		return result[x].Score > result[y].Score
+	})
 
 	return result
 }
