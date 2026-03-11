@@ -35,6 +35,14 @@ const (
 	ModeListeningForMark
 )
 
+type SearchBarPrefix string
+
+const (
+	SearchBarPrefixSearching = "searching"
+	SearchBarPrefixSearched = "searched"
+	SearchBarPrefixNavigating = "navigating"
+)
+
 // CLEANUP: Remove these global variables. Split them in separate struct types.
 // Introduce different modules for different responsibilities: UI, user input,
 // file management/parsing.
@@ -60,6 +68,7 @@ var (
 	scrollOffset       int
 	parentScrollOffset int
 	selectedIdx        int
+	searchBarPrefix    SearchBarPrefix
 
 	marks map[rune]string
 )
@@ -185,6 +194,7 @@ func main() {
 
 	pathToPrint := ""
 	positionHistory = make(map[string]int)
+	searchBarPrefix = SearchBarPrefixNavigating
 
 	marks, err = readMarks(config)
 	if err != nil {
@@ -359,10 +369,11 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	dimensions := v4{x1: mainPaneDimensions.x1, y1: 0, x2: w, y2: 0}
 	switch currMode {
 	case ModeDefault:
-		drawText(screen, dimensions, StylePathIndicator, fmt.Sprintf("Navigating: %s", currPath))
+		text := fmt.Sprintf("%s: %s", searchBarPrefix, currPath)
+		drawText(screen, dimensions, StylePathIndicator,text) 
 	case ModeSearch:
-		content := fmt.Sprintf("Searching: %s/%s", currPath, currSearchEntry)
-		drawText(screen, dimensions, StyleActivePathIndicator, content)
+		text := fmt.Sprintf("%s: %s/%s", searchBarPrefix, currPath, currSearchEntry)
+		drawText(screen, dimensions, StyleActivePathIndicator, text)
 		screen.ShowCursor(dimensions.x2 + 1, dimensions.y1)
 		screen.SetCursorStyle(tcell.CursorStyleBlinkingBlock)
 	}
@@ -608,6 +619,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 
 	case '/':
 		currMode = ModeSearch
+		searchBarPrefix = SearchBarPrefixSearching
 
 	case 'm':
 		currMode = ModeRecordingMark
@@ -670,12 +682,14 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 		// first entry.
 		selectedIdx = 0
 		scrollOffset = 0
+		searchBarPrefix = SearchBarPrefixSearched
 
 	case tcell.KeyESC:
 		// Disable search mode and ignore the current search string. This is
 		// consistent with how searching work in Vim.
 		currMode = ModeDefault
 		currSearchEntry = ""
+		searchBarPrefix = SearchBarPrefixNavigating
 		handleDirectoryChange(currPath, config)
 
 	case tcell.KeyTAB:
@@ -698,6 +712,12 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 				}
 			}
 		}
+		
+		if currSearchEntry == "" {
+			searchBarPrefix = SearchBarPrefixNavigating
+		} else {
+			searchBarPrefix = SearchBarPrefixSearching
+		}
 
 		currSearchEntry = ""
 		
@@ -708,6 +728,9 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 		}
 		
 		handleDirectoryChange(currPath, config)
+		selectedIdx = 0
+		scrollOffset = 0 
+		currSearchEntry	= ""
 	}
 
 	return keyHandlingResult{shouldQuit: false, newPath: ""}, nil
