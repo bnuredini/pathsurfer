@@ -38,10 +38,12 @@ const (
 type SearchBarPrefix string
 
 const (
-	SearchBarPrefixSearching = "searching"
-	SearchBarPrefixSearched = "searched"
+	SearchBarPrefixSearching  = "searching"
+	SearchBarPrefixSearched   = "searched"
 	SearchBarPrefixNavigating = "navigating"
 )
+
+const BigJumpLength = 22
 
 // CLEANUP: Remove these global variables. Split them in separate struct types.
 // Introduce different modules for different responsibilities: UI, user input,
@@ -285,16 +287,14 @@ func getFilteredDirEntires(path string, config *conf.Config) []fs.DirEntry {
 // only touch the file listings.
 func handleFileListingChange(rawFiles []fs.DirEntry, config *conf.Config) {
 	updateFileListing(rawFiles, config)
-	
+
 	if len(files) == 0 {
 		selectedIdx = 0
 	} else if selectedIdx >= len(files) {
 		selectedIdx = len(files) - 1
 	}
 
-	_, screenHeight := screen.Size()
-	heightUsableForFiles := max(screenHeight-2, 1)
-	scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
+	scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
 }
 
 func updateFileListing(rawFiles []fs.DirEntry, config *conf.Config) {
@@ -370,11 +370,11 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	switch currMode {
 	case ModeDefault:
 		text := fmt.Sprintf("%s: %s", searchBarPrefix, currPath)
-		drawText(screen, dimensions, StylePathIndicator,text) 
+		drawText(screen, dimensions, StylePathIndicator, text)
 	case ModeSearch:
 		text := fmt.Sprintf("%s: %s/%s", searchBarPrefix, currPath, currSearchEntry)
 		drawText(screen, dimensions, StyleActivePathIndicator, text)
-		screen.ShowCursor(dimensions.x2 + 1, dimensions.y1)
+		screen.ShowCursor(dimensions.x2+1, dimensions.y1)
 		screen.SetCursorStyle(tcell.CursorStyleBlinkingBlock)
 	}
 
@@ -392,7 +392,7 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 		}
 	}
 
-	parentScrollOffset = calculateScrollOffset(
+	parentScrollOffset = calculateScrollOffsetForHeight(
 		parentSelectedIdx,
 		parentScrollOffset,
 		max(h-2, 1),
@@ -404,7 +404,6 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 		childDir := filepath.Join(currPath, files[selectedIdx].Name())
 		childFiles = getFilteredDirEntires(childDir, config)
 	}
-	
 
 	drawPane(screen, parentFiles, leftPaneDimensions, parentSelectedIdx, parentScrollOffset)
 	if currMode == ModeSearch {
@@ -475,7 +474,7 @@ func drawMarkHintSection(screen tcell.Screen, config *conf.Config) {
 
 	idx := 0
 	for entry, value := range marks {
-		dimensions := v4{0, (h-1) - idx, w, (h-1) - idx}
+		dimensions := v4{0, (h - 1) - idx, w, (h - 1) - idx}
 		drawText(
 			screen,
 			dimensions,
@@ -505,9 +504,9 @@ func drawText(screen tcell.Screen, dimensions v4, style tcell.Style, text string
 }
 
 type keyHandlingResult struct {
-	shouldQuit bool
+	shouldQuit    bool
 	addingNewMark bool
-	newPath    string
+	newPath       string
 }
 
 func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
@@ -561,10 +560,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 		}
 
 		selectedIdx = (selectedIdx + 1) % len(files)
-		_, screenHeight := screen.Size()
-		heightUsableForFiles := max(screenHeight-3, 1) // TODO: Store pane info elsewhere. That would remove this magic 3.
-
-		scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
+		scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
 
 	case 'k':
 		if len(files) == 0 {
@@ -572,10 +568,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 		}
 
 		selectedIdx = (selectedIdx - 1 + len(files)) % len(files)
-		_, screenHeight := screen.Size()
-		heightUsableForFiles := max(screenHeight-3, 1)
-
-		scrollOffset = calculateScrollOffset(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
+		scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
 
 	case 'h':
 		positionHistory[currPath] = selectedIdx
@@ -628,6 +621,25 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 		currMode = ModeListeningForMark
 	}
 
+	switch ev.Key() {
+	case tcell.KeyCtrlD:
+		if selectedIdx >= len(files)-1 {
+			break
+		}
+
+		selectedIdx = min(selectedIdx+BigJumpLength, len(files)-1)
+		scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
+
+	case tcell.KeyCtrlU:
+		if selectedIdx <= BigJumpLength {
+			selectedIdx = 0
+		} else {
+			selectedIdx = selectedIdx - BigJumpLength
+		}
+
+		scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
+	}
+
 	return result, nil
 }
 
@@ -677,7 +689,7 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 
 		currMode = ModeDefault
 		currSearchEntry = ""
-		
+
 		// The user is now done with searching. Set the marker to point to the
 		// first entry.
 		selectedIdx = 0
@@ -712,7 +724,7 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 				}
 			}
 		}
-		
+
 		if currSearchEntry == "" {
 			searchBarPrefix = SearchBarPrefixNavigating
 		} else {
@@ -720,17 +732,17 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 		}
 
 		currSearchEntry = ""
-		
+
 	case tcell.KeyBacktab:
 		parentPath := filepath.Dir(filepath.Clean(currPath))
 		if currPath != parentPath {
 			currPath = parentPath
 		}
-		
+
 		handleDirectoryChange(currPath, config)
 		selectedIdx = 0
-		scrollOffset = 0 
-		currSearchEntry	= ""
+		scrollOffset = 0
+		currSearchEntry = ""
 	}
 
 	return keyHandlingResult{shouldQuit: false, newPath: ""}, nil
@@ -792,8 +804,15 @@ func readMarks(config *conf.Config) (map[rune]string, error) {
 	return result, err
 }
 
+func calculateScrollOffset(screen tcell.Screen, selectedIdx, currScrollOffset, listLen int) int {
+	_, screenHeight := screen.Size()
+	heightUsableForFiles := max(screenHeight-3, 1)
+
+	return calculateScrollOffsetForHeight(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
+}
+
 // BUG: Wrapping is buggy right now. Try wrapping in a directory with a lot of files.
-func calculateScrollOffset(selectedIdx, currScrollOffset, heightUsableForFiles, listLen int) int {
+func calculateScrollOffsetForHeight(selectedIdx, currScrollOffset, heightUsableForFiles, listLen int) int {
 	result := 0
 
 	if selectedIdx < currScrollOffset {
@@ -810,7 +829,7 @@ func calculateScrollOffset(selectedIdx, currScrollOffset, heightUsableForFiles, 
 		result = currScrollOffset
 	}
 
-	maxOffset := max((listLen-1)-heightUsableForFiles, 0)
+	maxOffset := max((listLen-1)-(heightUsableForFiles-1), 0)
 
 	return min(result, maxOffset)
 }
