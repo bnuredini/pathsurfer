@@ -10,9 +10,6 @@ A tiny terminal utility for navigating through directories more quickly.
 
 ## Features
 
-> ⚠️ **Warning.** This is **pre-alpha software**. It's under active development
-> and behavior may change at any time.
-
 * Directory navigation
 * Fuzzy finding
 * Vi-like keybindings
@@ -20,6 +17,9 @@ A tiny terminal utility for navigating through directories more quickly.
 * Integration with bash, zsh, and fish to change your current directory
 
 ## Installing
+
+> ⚠️ **Warning.** This is **pre-alpha software**. It's under active development
+> and behavior may change at any time.
 
 ```bash
 curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-linux-amd64.tar.gz | tar xz
