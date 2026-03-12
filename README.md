@@ -10,9 +10,8 @@ A tiny terminal utility for navigating through directories more quickly.
 
 ## Features
 
-> ⚠️ **WARNING**
->
-> This is **pre-alpha software**. It's under active development and behavior may change at any time.
+> ⚠️ **Warning.** This is **pre-alpha software**. It's under active development
+> and behavior may change at any time.
 
 * Directory navigation
 * Fuzzy finding
