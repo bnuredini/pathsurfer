@@ -1,5 +1,11 @@
 # To-do list
 
+* Bugs
+    - Tab is buggy
+* Improvements
+    - Add a "Searched" line in the search bar
+    - Respect position history when using Shift-TAB
+    - When in search mode, ignore subsequent presses of the "/" key
 * Bookmarks
 * Git info for repositories
 * Useful directory info (size, file count, directory count)
