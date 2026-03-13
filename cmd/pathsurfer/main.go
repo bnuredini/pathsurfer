@@ -72,6 +72,12 @@ var (
 	selectedIdx        int
 	searchBarPrefix    SearchBarPrefix
 
+	// It makes sense to use this value only if waitingForAnotherKeyPress is
+	// true. The purpose of these to variables is to add support for Vi-like
+	// keybindings such as gg.
+	previousKeyPressed        rune
+	waitingForAnotherKeyPress bool
+
 	marks map[rune]string
 )
 
@@ -97,6 +103,10 @@ var KeysThatTriggerRedrawInDefault = []tcell.Key{
 	tcell.KeyCR,
 	tcell.KeyTAB,
 	tcell.KeyESC,
+}
+
+var ChainableKeybindings = map[rune][]rune {
+	'g': []rune{'g'},
 }
 
 func main() {
@@ -549,6 +559,12 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult,
 
 func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
 	result := keyHandlingResult{shouldQuit: false, newPath: ""}
+	
+	if waitingForAnotherKeyPress && !canKeyPressesBeChained(previousKeyPressed, ev.Rune()) {
+		// CLEANUP: Find a better reset value.
+		previousKeyPressed = ' '
+		waitingForAnotherKeyPress = false
+	}
 
 	switch ev.Rune() {
 	case 'q':
@@ -619,6 +635,27 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 
 	case '\'':
 		currMode = ModeListeningForMark
+
+	case 'g':
+		if !waitingForAnotherKeyPress {
+			waitingForAnotherKeyPress = true
+			previousKeyPressed = 'g'
+			break
+		}
+
+		if previousKeyPressed == 'g' {
+			selectedIdx = 0
+			scrollOffset = 0
+		}
+
+		waitingForAnotherKeyPress = false
+
+	case 'G':
+		selectedIdx = len(files) - 1
+
+		_, screenHeight := screen.Size()
+		heightUsableForFiles := max(screenHeight-3, 1)
+		scrollOffset = max((len(files)-1)-(heightUsableForFiles-1), 0)
 	}
 
 	switch ev.Key() {
@@ -639,7 +676,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 
 		scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
 	}
-
+	
 	return result, nil
 }
 
@@ -886,4 +923,13 @@ func render(keyChangesChan chan *tcell.EventKey, errorChan chan error, config *c
 			screen.Show()
 		}
 	}
+}
+
+func canKeyPressesBeChained(key1, key2 rune) bool {
+	chainableWithKey1, ok := ChainableKeybindings[key1]
+	if !ok {
+		return false
+	}
+	
+	return slices.Contains(chainableWithKey1, key2)
 }
