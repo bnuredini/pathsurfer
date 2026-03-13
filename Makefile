@@ -1,7 +1,7 @@
 main_package_path = ./cmd/pathsurfer
 
 binary_name = pathsurfer
-binary_path = ./bin/${binary_name}
+binary_path = ./build/${binary_name}
 binary_ext =
 ifeq ($(GOOS),windows)
 	binary_ext = .exe
@@ -44,7 +44,7 @@ integrate/fish:
 	@echo "source $(script_install_dir_for_fish)/psurf_keybindings.fish"
 	@echo '```'
 
-## integrate/bash: integrate the binary stored in <project-path>/bin/ for bash
+## integrate/bash: integrate the binary stored in <project-path>/build/ for bash
 .PHONY: integrate/bash
 integrate/bash:
 	@echo "Installing the psurf script to $(script_install_dir)..."
@@ -58,7 +58,7 @@ integrate/bash:
 	@echo ""
 	@echo "Installation complete. Run 'source $(bashrc)' or restart your shell to use psurf."
 
-## integrate/zsh: integrate the binary stored in <project-path>/bin/ for zsh
+## integrate/zsh: integrate the binary stored in <project-path>/build/ for zsh
 .PHONY: integrate/zsh
 integrate/zsh:
 	@echo "Installing the psurf script to $(script_install_dir)..."
@@ -78,7 +78,7 @@ uninstall:
 	rm -f $(install_path)
 	@echo "Uninstallation completed"
 
-## uninstall/fish: install the binary stored in <project-path>/bin/ for fish
+## uninstall/fish: install the binary stored in <project-path>/build/ for fish
 .PHONY: uninstall/fish
 uninstall/fish:
 	@echo "Removing $(script_install_dir_for_fish)/psurf.fish..."
