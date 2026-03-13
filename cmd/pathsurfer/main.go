@@ -105,7 +105,7 @@ var KeysThatTriggerRedrawInDefault = []tcell.Key{
 	tcell.KeyESC,
 }
 
-var ChainableKeybindings = map[rune][]rune {
+var ChainableKeybindings = map[rune][]rune{
 	'g': []rune{'g'},
 }
 
@@ -559,7 +559,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult,
 
 func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
 	result := keyHandlingResult{shouldQuit: false, newPath: ""}
-	
+
 	if waitingForAnotherKeyPress && !canKeyPressesBeChained(previousKeyPressed, ev.Rune()) {
 		// CLEANUP: Find a better reset value.
 		previousKeyPressed = ' '
@@ -676,7 +676,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 
 		scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
 	}
-	
+
 	return result, nil
 }
 
@@ -930,6 +930,6 @@ func canKeyPressesBeChained(key1, key2 rune) bool {
 	if !ok {
 		return false
 	}
-	
+
 	return slices.Contains(chainableWithKey1, key2)
 }
