@@ -714,23 +714,29 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 		handleDirectoryChange(currPath, config)
 
 	case tcell.KeyTAB:
+		logger.Debug("pressed TAB", "selectedIdx", selectedIdx, "currSearchEntry", currSearchEntry, "currPath", currPath, "waitingForAnotherKeyPress", waitingForAnotherKeyPress)
+	
 		if len(files) == 0 {
 			break
 		}
 
 		firstMatch := files[0]
 		if firstMatch.IsDir() {
-			if selectedIdx < len(files) && files[selectedIdx].IsDir() {
-				positionHistory[currPath] = selectedIdx
+			idx, idxFound := getEntryIndexFromPath(currPath, firstMatch.Name())
+			if !idxFound {
+				// TODO: Log error in screen.
+				break
+			}
+			
+			positionHistory[currPath] = idx
+			newPath := filepath.Join(currPath, firstMatch.Name())
+			handleDirectoryChange(newPath, config)
+			currPath = newPath
 
-				currPath = filepath.Join(currPath, files[selectedIdx].Name())
-				handleDirectoryChange(currPath, config)
-
-				if idxFromHistory, ok := positionHistory[currPath]; ok {
-					selectedIdx = idxFromHistory
-				} else {
-					selectedIdx = 0
-				}
+			if idxFromHistory, ok := positionHistory[currPath]; ok {
+				selectedIdx = idxFromHistory
+			} else {
+				selectedIdx = 0
 			}
 		}
 
@@ -960,4 +966,20 @@ func canKeyPressesBeChained(key1, key2 rune) bool {
 	}
 
 	return slices.Contains(chainableWithKey1, key2)
+}
+
+func getEntryIndexFromPath(path, entryToLookFor string) (int, bool) {
+	pathEntries, err := os.ReadDir(path)
+	if err != nil {
+		logger.Debug("failed to read directory entries", "err", err, "currPath", currPath)
+		return -1, false
+	}
+	
+	for i, entry := range pathEntries {
+		if entry.Name() == entryToLookFor {
+			return i, true
+		}
+	}
+	
+	return -1, false
 }
