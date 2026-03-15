@@ -714,8 +714,6 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 		handleDirectoryChange(currPath, config)
 
 	case tcell.KeyTAB:
-		logger.Debug("pressed TAB", "selectedIdx", selectedIdx, "currSearchEntry", currSearchEntry, "currPath", currPath, "waitingForAnotherKeyPress", waitingForAnotherKeyPress)
-	
 		if len(files) == 0 {
 			break
 		}
