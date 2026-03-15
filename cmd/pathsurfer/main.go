@@ -571,56 +571,16 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 		return keyHandlingResult{shouldQuit: true, newPath: currPath}, nil
 
 	case 'j':
-		if len(files) == 0 {
-			break
-		}
-
-		selectedIdx = (selectedIdx + 1) % len(files)
-		scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
+		handleKeyPressDown()
 
 	case 'k':
-		if len(files) == 0 {
-			break
-		}
-
-		selectedIdx = (selectedIdx - 1 + len(files)) % len(files)
-		scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
+		handleKeyPressUp()
 
 	case 'h':
-		positionHistory[currPath] = selectedIdx
-
-		oldPath := currPath
-		newPath := filepath.Dir(currPath)
-		currPath = newPath
-
-		idxFromHistory, ok := positionHistory[newPath]
-		if !ok {
-			handleDirectoryChange(currPath, config)
-
-			for i, f := range files {
-				if f.Name() == filepath.Base(oldPath) {
-					selectedIdx = i
-				}
-			}
-		} else {
-			handleDirectoryChange(currPath, config)
-			selectedIdx = idxFromHistory
-		}
+		handleKeyPressLeft(config)
 
 	case 'l':
-		if selectedIdx < len(files) && files[selectedIdx].IsDir() {
-			parentScrollOffset = scrollOffset
-			positionHistory[currPath] = selectedIdx
-
-			currPath = filepath.Join(currPath, files[selectedIdx].Name())
-			handleDirectoryChange(currPath, config)
-
-			if idxFromHistory, ok := positionHistory[currPath]; ok {
-				selectedIdx = idxFromHistory
-			} else {
-				selectedIdx = 0
-			}
-		}
+		handleKeyPressRight(config)
 
 	case '.':
 		config.ShowHiddenFiles = !config.ShowHiddenFiles
@@ -659,6 +619,18 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 	}
 
 	switch ev.Key() {
+	case tcell.KeyUp:
+		handleKeyPressUp()
+		
+	case tcell.KeyDown:
+		handleKeyPressDown()
+		
+	case tcell.KeyLeft:
+		handleKeyPressLeft(config)
+		
+	case tcell.KeyRight:
+		handleKeyPressRight(config)
+	
 	case tcell.KeyCtrlD:
 		if selectedIdx >= len(files)-1 {
 			break
@@ -783,6 +755,62 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 	}
 
 	return keyHandlingResult{shouldQuit: false, newPath: ""}, nil
+}
+
+func handleKeyPressDown() {
+	if len(files) == 0 {
+		return
+	}
+
+	selectedIdx = (selectedIdx + 1) % len(files)
+	scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
+}
+
+func handleKeyPressUp() {
+	if len(files) == 0 {
+		return
+	}
+
+	selectedIdx = (selectedIdx - 1 + len(files)) % len(files)
+	scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
+}
+
+func handleKeyPressLeft(config *conf.Config) {
+	positionHistory[currPath] = selectedIdx
+
+	oldPath := currPath
+	newPath := filepath.Dir(currPath)
+	currPath = newPath
+
+	idxFromHistory, ok := positionHistory[newPath]
+	if !ok {
+		handleDirectoryChange(currPath, config)
+
+		for i, f := range files {
+			if f.Name() == filepath.Base(oldPath) {
+				selectedIdx = i
+			}
+		}
+	} else {
+		handleDirectoryChange(currPath, config)
+		selectedIdx = idxFromHistory
+	}
+}
+
+func handleKeyPressRight(config *conf.Config) {
+	if selectedIdx < len(files) && files[selectedIdx].IsDir() {
+		parentScrollOffset = scrollOffset
+		positionHistory[currPath] = selectedIdx
+
+		currPath = filepath.Join(currPath, files[selectedIdx].Name())
+		handleDirectoryChange(currPath, config)
+
+		if idxFromHistory, ok := positionHistory[currPath]; ok {
+			selectedIdx = idxFromHistory
+		} else {
+			selectedIdx = 0
+		}
+	}
 }
 
 func storeNewMark(r rune, path string, config *conf.Config) error {
