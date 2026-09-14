@@ -52,7 +52,6 @@ const BigJumpLength = 22
 // Follow a simple: Model -> Render -> Update.
 var (
 	screen tcell.Screen
-	logger *slog.Logger
 
 	currPath        string
 	currMode        Mode
@@ -68,6 +67,7 @@ var (
 	// This value indicates how many lines/rows have been scrolled past by the
 	// user.
 	scrollOffset       int
+	// In the multi-pane view, the scroll offset of the parent directory is also renderd.
 	parentScrollOffset int
 	selectedIdx        int
 	searchBarPrefix    SearchBarPrefix
@@ -114,7 +114,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to boot up: %v", err)
 	}
-
+	
 	if len(flag.Args()) > 0 {
 		pathArg := strings.TrimSpace(flag.Args()[0])
 
@@ -133,8 +133,7 @@ func main() {
 	logDir := filepath.Dir(config.LogFilePath)
 	logDirInfo, err := os.Stat(logDir)
 	if os.IsNotExist(err) {
-		err = os.Mkdir(logDir, 0755)
-		if err != nil {
+		if err = os.Mkdir(logDir, 0755); err != nil {
 			log.Printf("Failed to create %q for storing logs", logDir)
 		}
 	} else if err != nil {
@@ -156,44 +155,30 @@ func main() {
 	}
 
 	logHandler := slog.NewTextHandler(logFile, logHandlerOpts)
-	logger = slog.New(logHandler)
-
+	
+	logger := slog.New(logHandler)
+	slog.SetDefault(logger)
+	
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("Application panicked", "panic", r)
+			slog.Error("Application panicked", "panic", r)
 		}
 
 		if logFile != nil {
-			logger.Debug("Application shutting down. Closing log file...")
+			slog.Debug("Application shutting down. Closing log file...")
 
 			if closeErr := logFile.Close(); closeErr != nil {
 				log.Fatalf("Failed to close log file: %v", closeErr)
 			}
 		}
 	}()
-
-	if strings.TrimSpace(currPath) == "" {
-		currPath, err = os.Getwd()
-		if err != nil {
-			logger.Info("Couldn't get current directory", "err", err)
-			os.Exit(1)
-		}
-	}
-
-	screen, err = tcell.NewScreen()
-	if err != nil {
-		logger.Error("Couldn't create screen", "err", err)
-		os.Exit(1)
-	}
-	if err := screen.Init(); err != nil {
-		logger.Error("Couldn't initialize screen", "err", err)
-		os.Exit(1)
-	}
-
+	
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-signalChan
+		
+		slog.Debug("Received interrupt signal. Exiting...")
 		screen.Fini()
 		if logFile != nil {
 			_ = logFile.Close()
@@ -201,12 +186,30 @@ func main() {
 		os.Exit(0)
 	}()
 
+	screen, err = tcell.NewScreen()
+	if err != nil {
+		slog.Error("Couldn't create screen", "err", err)
+		os.Exit(1)
+	}
+	if err := screen.Init(); err != nil {
+		slog.Error("Couldn't initialize screen", "err", err)
+		os.Exit(1)
+	}
+
 	screen.SetStyle(StyleReset)
 	screen.Clear()
 
 	pathToPrint := ""
 	positionHistory = make(map[string]int)
 	searchBarPrefix = SearchBarPrefixNavigating
+	
+	if strings.TrimSpace(currPath) == "" {
+		currPath, err = os.Getwd()
+		if err != nil {
+			slog.Info("Couldn't get current directory", "err", err)
+			os.Exit(1)
+		}
+	}
 
 	marks, err = readMarks(config)
 	if err != nil {
@@ -270,7 +273,7 @@ func getFilteredDirEntires(path string, config *conf.Config) []fs.DirEntry {
 	rawFiles, err := os.ReadDir(path)
 	if err != nil {
 		// TODO: Return an error value here and display it on the screen.
-		logger.Debug("Failed to read directory", "path", path, "err", err)
+		slog.Debug("Failed to read directory", "path", path, "err", err)
 		return result
 	}
 
@@ -329,10 +332,10 @@ func handleDirectoryChange(path string, config *conf.Config) {
 	dir, err := os.ReadDir(path)
 	if err != nil {
 		if os.IsPermission(err) {
-			logger.Error("Encountered a permissions issue when updating the file listing", "err", err)
+			slog.Error("Encountered a permissions issue when updating the file listing", "err", err)
 		}
 
-		logger.Error("Couldn't read directory", "currPath", currPath, "err", err)
+		slog.Error("Couldn't read directory", "currPath", currPath, "err", err)
 		files = []fs.DirEntry{}
 		selectedIdx = 0
 		scrollOffset = 0
@@ -934,7 +937,7 @@ func render(keyChangesChan chan *tcell.EventKey, errorChan chan error, config *c
 			keyRune := eventKey.Rune()
 			key := eventKey.Key()
 
-			logger.Debug("render: processing...", "keyRune", eventKey.Rune(), "keyString", string(eventKey.Rune()), "currMode", currMode, "selectedIdx", selectedIdx)
+			slog.Debug("render: processing...", "keyRune", eventKey.Rune(), "keyString", string(eventKey.Rune()), "currMode", currMode, "selectedIdx", selectedIdx)
 
 			shouldRedrawInDefault :=
 				slices.Contains(RunesThatTriggerRedrawInDefault, keyRune) ||
@@ -969,7 +972,7 @@ func canKeyPressesBeChained(key1, key2 rune) bool {
 func getEntryIndexFromPath(path, entryToLookFor string) (int, bool) {
 	pathEntries, err := os.ReadDir(path)
 	if err != nil {
-		logger.Debug("failed to read directory entries", "err", err, "currPath", currPath)
+		slog.Debug("failed to read directory entries", "err", err, "currPath", currPath)
 		return -1, false
 	}
 	
