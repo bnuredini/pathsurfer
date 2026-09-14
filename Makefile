@@ -2,16 +2,23 @@ binary_name       = pathsurfer
 binary_path       = ./build/${binary_name}
 main_package_path = ./cmd/pathsurfer
 
-binary_ext =
-ifeq ($(GOOS),windows)
-	binary_ext = .exe
-endif
-
 curr_time 		= $(shell date -Iseconds)
 git_description = $(shell git describe --always --dirty)
 linker_flags    = '-s -X github.com/bnuredini/pathsurfer/internal/conf.buildTime=${curr_time} -X github.com/bnuredini/pathsurfer/internal/conf.version=${git_description}'
 
-install_path                = /usr/local/bin/pathsurfer
+GOOS := $(shell go env GOOS)
+
+ifeq ($(GOOS),darwin)
+	install_path := $(HOME)/.local/bin/pathsurfer
+else ifeq ($(GOOS),linux)
+	install_path := $(HOME)/.local/bin/pathsurfer
+else ifeq ($(GOOS),windows)
+	install_path := $(USERPROFILE)/bin/pathsurfer
+	binary_extension = .exe
+else
+	$(error Unsupported OS: $(GOOS))
+endif
+
 script_install_dir_for_fish = $(HOME)/.config/fish/conf.d
 script_install_dir          = $(HOME)/.local/share/pathsurfer/functions
 
@@ -21,12 +28,13 @@ zshrc  = $(HOME)/.zshrc
 ## build: build the application
 .PHONY: build
 build:
-	CGO_ENABLED=0 go build -ldflags=${linker_flags} -o=${binary_path}${binary_ext} ${main_package_path}
+	CGO_ENABLED=0 go build -ldflags=${linker_flags} -o=${binary_path}${binary_extension} ${main_package_path}
 
 ## install: install the application
 .PHONY: install
-install:
+install: build
 	@echo "Installing the binary to $(install_path)..."
+	mkdir -p "$(HOME)/.local/bin"
 	install -m 755 $(binary_path) $(install_path)
 	@echo "Installed $(install_path)"
 
@@ -108,7 +116,7 @@ uninstall/zsh:
 ## run: run the binary
 .PHONY: run
 run:
-	${binary_path}${binary_ext}
+	${binary_path}${binary_extension}
 
 ## run/live: run the application with reloading on file changes
 .PHONY: run/live
@@ -121,4 +129,4 @@ run/live:
 		--watch internal \
 		--watch go.mod \
 		--watch go.sum \
-		--exts go -- "make build && ${binary_path}${binary_ext}"
+		--exts go -- "make build && ${binary_path}${binary_extension}"
