@@ -27,41 +27,42 @@ curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsu
 
 ## Building locally
 
+Building and integrating pathsurfer is easy: using Make, you'll just need to run one command to
+build the binary and two more commands for installing and integrating with your shell.
+
 ### Option #1: Building locally with `make`
 
 From the project's root, run the following:
 
 ```bash
-make build
-sudo make install
+make install
 ```
 
-Depending on which shell you use, you might want to run one of the following commands to integrate
-pathsurfer with your shell.
+Depending on which shell you use, run one of the following to integrate pathsurfer with your shell:
 
-* If you use bash, run `make integrate/bash`
-* If you use zsh, run `make integrate/zsh`
-* If you use fish, run `make integrate/fish`
+- If you use bash, run `make integrate/bash`
+- If you use zsh, run `make integrate/zsh`
+- If you use fish, run `make integrate/fish`
+
+Shell integration is what allows you to change directories when quitting the program.
 
 ### Option #2: Building locally with `go`
 
-If you don't have `make` installed in your system, you can build this project by using the Go
-toolchain directly.
-
-From project root, run the following:
+If you don't have `make` in your system, you can build by using the Go toolchain directly:
 
 ```bash
 go build ./cmd/pathsurfer
-sudo install -m 644 ./pathsurfer /usr/bin/pathsurfer
+mkdir -p ~/.local/bin
+install -m 644 ./bin/pathsurfer ~/.local/bin/pathsurfer
 ```
 
-If you use bash or zsh, add this line to your `.bashrc`/`.zshrc`:
+To integrate with bash or zsh, add this line to your `.bashrc`/`.zshrc`:
 
-```bash
+```
 source <path-to-this-repo>/scripts/psurf.sh
 ```
 
-If you use fish, run:
+To integrate with fish, run:
 
 ```bash
 install -m 644 ./scripts/psurf.fish ~/.config/fish/conf.d/psurf.fish
