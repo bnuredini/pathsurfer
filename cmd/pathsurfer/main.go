@@ -107,6 +107,7 @@ var KeysThatTriggerRedrawInDefault = []tcell.Key{
 
 var ChainableKeybindings = map[rune][]rune{
 	'g': []rune{'g'},
+	'c': []rune{'c'},
 }
 
 func main() {
@@ -153,7 +154,6 @@ func main() {
 	} else {
 		logHandlerOpts.Level = slog.LevelInfo
 	}
-
 	logHandler := slog.NewTextHandler(logFile, logHandlerOpts)
 	
 	logger := slog.New(logHandler)
@@ -256,8 +256,9 @@ func main() {
 	screen.Fini()
 
 	// Assuming that the user is using one of the wrapper scripts (psurf.sh or
-	// psurf.fish), this program will print the current directory and the
-	// wrapper will change the shell's directory to what gets printed here.
+	// psurf.fish), this program will print the current directory when the user
+	// breaks from the event loop. In which case the wrapper will change the
+	// shell's directory to what gets printed here.
 	if pathToPrint != "" {
 		fmt.Println(pathToPrint)
 	}
@@ -561,7 +562,7 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult,
 }
 
 func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
-	result := keyHandlingResult{shouldQuit: false, newPath: ""}
+	result := keyHandlingResult{}
 
 	if waitingForAnotherKeyPress && !canKeyPressesBeChained(previousKeyPressed, ev.Rune()) {
 		// CLEANUP: Find a better reset value.
@@ -613,6 +614,18 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 
 		waitingForAnotherKeyPress = false
 
+	case 'c':
+		if !waitingForAnotherKeyPress {
+			waitingForAnotherKeyPress = true
+			previousKeyPressed = 'c'
+			break
+		}
+		
+		if previousKeyPressed == 'c' {
+			s := filepath.Join(currPath, files[selectedIdx].Name())
+			writeToClipboard(s)
+		}
+	
 	case 'G':
 		selectedIdx = len(files) - 1
 
