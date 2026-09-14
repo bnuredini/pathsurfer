@@ -213,8 +213,7 @@ func main() {
 
 	marks, err = readMarks(config)
 	if err != nil {
-		// INCOMPLETE: Provide better information here.
-		log.Fatalf("Failed to read marks: %v", err)
+		marks = map[rune]string{}
 	}
 	handleDirectoryChange(currPath, config)
 	drawFileList(screen, config)
