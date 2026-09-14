@@ -232,6 +232,7 @@ func main() {
 		case *tcell.EventResize:
 			screen.Sync()
 			drawFileList(screen, config)
+			drawInfoLine(screen)
 
 		case *tcell.EventKey:
 			result, err := handleKeyPress(ev, config)
