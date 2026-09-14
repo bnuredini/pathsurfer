@@ -29,19 +29,7 @@ type Config struct {
 	ShowHiddenFiles bool
 }
 
-func Init() (*Config, error) {
-	flag.Usage = func() {
-		cliOutput := flag.CommandLine.Output()
-
-		fmt.Fprintln(cliOutput, "psurf - change directories quickly")
-		fmt.Fprintln(cliOutput, "")
-		fmt.Fprintln(cliOutput, "Usage:")
-		fmt.Fprintln(cliOutput, "  psurf [options] [path]")
-		fmt.Fprintln(cliOutput, "")
-		fmt.Fprintln(cliOutput, "Options:")
-		flag.PrintDefaults()
-	}
-
+func init() {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal("Failed to access the user's home directory")
@@ -61,6 +49,20 @@ func Init() (*Config, error) {
 		ProgramName,
 		fmt.Sprintf("%s.mark", ProgramName),
 	)
+}
+
+func Init() (*Config, error) {
+	flag.Usage = func() {
+		cliOutput := flag.CommandLine.Output()
+
+		fmt.Fprintln(cliOutput, "psurf - change directories quickly")
+		fmt.Fprintln(cliOutput, "")
+		fmt.Fprintln(cliOutput, "Usage:")
+		fmt.Fprintln(cliOutput, "  psurf [options] [path]")
+		fmt.Fprintln(cliOutput, "")
+		fmt.Fprintln(cliOutput, "Options:")
+		flag.PrintDefaults()
+	}
 
 	result := &Config{}
 	flag.BoolVar(
