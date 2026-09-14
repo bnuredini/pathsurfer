@@ -1,21 +1,22 @@
+binary_name       = pathsurfer
+binary_path       = ./build/${binary_name}
 main_package_path = ./cmd/pathsurfer
 
-binary_name = pathsurfer
-binary_path = ./build/${binary_name}
 binary_ext =
 ifeq ($(GOOS),windows)
 	binary_ext = .exe
 endif
 
-curr_time = $(shell date --iso-8601=seconds)
+curr_time 		= $(shell date -Iseconds)
 git_description = $(shell git describe --always --dirty)
-linker_flags = '-s -X github.com/bnuredini/pathsurfer/internal/conf.buildTime=${curr_time} -X github.com/bnuredini/pathsurfer/internal/conf.version=${git_description}'
+linker_flags    = '-s -X github.com/bnuredini/pathsurfer/internal/conf.buildTime=${curr_time} -X github.com/bnuredini/pathsurfer/internal/conf.version=${git_description}'
 
-install_path = /usr/local/bin/pathsurfer
+install_path                = /usr/local/bin/pathsurfer
 script_install_dir_for_fish = $(HOME)/.config/fish/conf.d
-script_install_dir = $(HOME)/.local/share/pathsurfer/functions
+script_install_dir          = $(HOME)/.local/share/pathsurfer/functions
+
 bashrc = $(HOME)/.bashrc
-zshrc = $(HOME)/.zshrc
+zshrc  = $(HOME)/.zshrc
 
 ## build: build the application
 .PHONY: build
