@@ -38,7 +38,7 @@ install: build
 	install -m 755 $(binary_path) $(install_path)
 	@echo "Installed $(install_path)"
 
-## integrate/fish: integrate the binary stored in <project-path>/bin/ for fish
+## integrate/fish: integrate the binary stored in <project-path>/build/ for fish
 .PHONY: integrate/fish
 integrate/fish:
 	@echo "Installing psurf scripts to $(script_install_dir_for_fish)/psurf.fish..."
@@ -87,7 +87,7 @@ uninstall:
 	rm -f $(install_path)
 	@echo "Uninstallation completed"
 
-## uninstall/fish: install the binary stored in <project-path>/build/ for fish
+## uninstall/fish: remove fish integration
 .PHONY: uninstall/fish
 uninstall/fish:
 	@echo "Removing $(script_install_dir_for_fish)/psurf.fish..."
