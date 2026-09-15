@@ -25,6 +25,46 @@ A tiny terminal utility for navigating through directories more quickly.
 curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-linux-amd64.tar.gz | tar xz
 ```
 
+macOS:
+
+```bash
+curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-darwin-arm64.tar.gz | tar xz
+./pathsurfer-darwin-arm64.tar.gz wizard
+```
+
+Windows:
+
+```bash
+curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-windows-amd64-.tar.gz | tar xz
+./pathsurfer-windows-amd64.tar.gz wizard
+```
+
+## Keybindings
+
+| Action              | Key               | Description                                                   |
+| ------------------- | --------------    | ------------------------------------------------------------- |
+| Move up             | <kbd>k</kbd>      | Move up in the file list                                      |
+| Move down           | <kbd>j</kbd>      | Move down in the file list                                    |
+| Go back             | <kbd>h</kbd>      | Go back one directory                                         |
+| Go forward          | <kbd>l</kbd>      | Change into a directory                                       |
+| Search              | <kbd>/</kbd>      | Enter search mode                                             |
+| Toggle hidden files | <kbd>.</kbd>      | Toggle hidden files in list                                   |
+| Quit                | <kbd>q</kbd>      | Quits the program                                             |
+| Exit search         | <kbd>ESC</kbd>    | Exists out of search mode                                     |
+| Record bookamark    | <kbd>m</kbd>      | Prompts for a key to be associated with the current directory |
+| Go to bookamark     | <kbd>'</kbd>      | Prompts for a bookmarked key                                  |
+| Go to top           | <kbd>gg</kbd>     | Move the cursor at the top of the list                        |
+| Big move up         | <kbd>CTRL+u</kbd> | Move the cursor 22 rows up                                    |
+| Big move down       | <kbd>CTRL+d</kbd> | Move the cursor 22 rows down                                  |
+
+## Search mode
+
+| Action              | Key                  | Description                                                   |
+| ------------------- | --------------       | ------------------------------------------------------------- |
+| Enter directory     | <kbd>TAB</kbd>       | Enter in to the directory showing up as the top search result |
+| Go back directory   | <kbd>Shift+TAB</kbd> | Go back one directory                                         |
+| Escape              | <kbd>ESC</kbd>       | Escape out of search mode                                     |
+
 ## Building locally
 
 Building and integrating pathsurfer is easy: using Make, you'll just need to run one command to
