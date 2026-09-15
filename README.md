@@ -1,6 +1,6 @@
 # pathsurfer
 
-A tiny terminal utility for navigating through directories more quickly.
+A tiny terminal utility for fast directory navigating.
 
 <p align="center">
   <img src="https://github.com/bnuredini/pathsurfer/blob/master/docs/imgs/screenshot1.png" alt="pathsurfer screenshot" width="80%">
@@ -10,19 +10,30 @@ A tiny terminal utility for navigating through directories more quickly.
 
 ## Features
 
+> **Warning.**
+>
+> This is **pre-alpha software**. It's under active development and behavior may change at any time.
+
 * Directory navigation
 * Fuzzy finding
 * Vi-like keybindings
 * Configurable settings
-* Integration with bash, zsh, and fish to change your current directory
+* Integration with bash, zsh, and fish for fast directory navigation
+
+<!--
+## Quickstart
+
+```bash
+curl -fsSL https://github.com/bnuredini/pathsurfer/releases/latest/download/install.sh  | sh
+```
 
 ## Installing
 
-> ⚠️ **Warning.** This is **pre-alpha software**. It's under active development
-> and behavior may change at any time.
+Linux:
 
 ```bash
 curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-linux-amd64.tar.gz | tar xz
+./pathsurfer-linux-amd64.tar.gz wizard
 ```
 
 macOS:
@@ -38,6 +49,8 @@ Windows:
 curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-windows-amd64-.tar.gz | tar xz
 ./pathsurfer-windows-amd64.tar.gz wizard
 ```
+
+-->
 
 ## Keybindings
 
