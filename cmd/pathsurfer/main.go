@@ -66,7 +66,7 @@ var (
 	// Used when the number of files is higher than what can fit on the screen.
 	// This value indicates how many lines/rows have been scrolled past by the
 	// user.
-	scrollOffset       int
+	scrollOffset int
 	// In the multi-pane view, the scroll offset of the parent directory is also renderd.
 	parentScrollOffset int
 	selectedIdx        int
@@ -109,7 +109,7 @@ var KeysThatTriggerRedrawInDefault = []tcell.Key{
 
 var ChainableKeybindings = map[rune][]rune{
 	'g': []rune{'g'},
-	'c': []rune{'c'},
+	'c': []rune{'c', 'n'},
 }
 
 func main() {
@@ -117,7 +117,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to boot up: %v", err)
 	}
-	
+
 	if len(flag.Args()) > 0 {
 		pathArg := strings.TrimSpace(flag.Args()[0])
 
@@ -157,10 +157,10 @@ func main() {
 		logHandlerOpts.Level = slog.LevelInfo
 	}
 	logHandler := slog.NewTextHandler(logFile, logHandlerOpts)
-	
+
 	logger := slog.New(logHandler)
 	slog.SetDefault(logger)
-	
+
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("Application panicked", "panic", r)
@@ -174,12 +174,12 @@ func main() {
 			}
 		}
 	}()
-	
+
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-signalChan
-		
+
 		slog.Debug("Received interrupt signal. Exiting...")
 		screen.Fini()
 		if logFile != nil {
@@ -204,7 +204,7 @@ func main() {
 	pathToPrint := ""
 	positionHistory = make(map[string]int)
 	searchBarPrefix = SearchBarPrefixNavigating
-	
+
 	if strings.TrimSpace(currPath) == "" {
 		currPath, err = os.Getwd()
 		if err != nil {
@@ -420,7 +420,7 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 		childDir := filepath.Join(currPath, files[selectedIdx].Name())
 		childFiles = getFilteredDirEntires(childDir, config)
 	}
-	
+
 	drawPane(screen, parentFiles, leftPaneDimensions, parentSelectedIdx, parentScrollOffset)
 	drawPane(screen, files, mainPaneDimensions, selectedIdx, scrollOffset)
 	drawPane(screen, childFiles, rightPaneDimensions, 0, 0)
@@ -466,7 +466,7 @@ func drawInfoLine(screen tcell.Screen) {
 
 func drawMarkHintSection(screen tcell.Screen, config *conf.Config) {
 	w, h := screen.Size()
-	
+
 	if len(marks) == 0 {
 		drawText(
 			screen,
@@ -476,11 +476,11 @@ func drawMarkHintSection(screen tcell.Screen, config *conf.Config) {
 		)
 	}
 
-	drawText(screen, v4{0, (h-1) - len(marks), w, (h-1) - len(marks)}, StyleInfo, "Bookmarks")
-	
-	index := len(marks) - 1 
+	drawText(screen, v4{0, (h - 1) - len(marks), w, (h - 1) - len(marks)}, StyleInfo, "Bookmarks")
+
+	index := len(marks) - 1
 	for entry, value := range marks {
-		dimensions := v4{0, (h-1) - index, w, (h-1) - index}
+		dimensions := v4{0, (h - 1) - index, w, (h - 1) - index}
 		drawText(
 			screen,
 			dimensions,
@@ -514,13 +514,13 @@ func drawFullLine(screen tcell.Screen, text string, style tcell.Style) {
 	col := 0
 	for _, r := range text {
 		screen.SetContent(col, h-1, r, nil, style)
-		
+
 		if col >= w-1 {
 			break
 		}
 		col++
 	}
-	
+
 	for col < w {
 		screen.SetContent(col, h-1, ' ', nil, style)
 		col++
@@ -544,16 +544,16 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult,
 
 	var err error
 	switch currMode {
-    case ModeDefault:
+	case ModeDefault:
 		result, err = handleKeyPressInDefault(ev, config)
-		case ModeSearch: 
+	case ModeSearch:
 		result, err = handleKeyPressInSearch(ev, config)
 	case ModeRecordingMark:
 		result, err = handleKeyPressInRecordingMark(ev, config)
 	case ModeListeningForMark:
 		result, err = handleKeyPressInListeningForMark(ev, config)
 	}
-	
+
 	if err != nil {
 		return result, err
 	}
@@ -569,7 +569,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 		previousKeyPressed = ' '
 		waitingForAnotherKeyPress = false
 	}
-	
+
 	if searchBarPrefix == SearchBarPrefixSearched {
 		searchBarPrefix = SearchBarPrefixNavigating
 	}
@@ -624,33 +624,38 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 			previousKeyPressed = 'c'
 			break
 		}
-		
+
 		if previousKeyPressed == 'c' {
 			s := filepath.Join(currPath, files[selectedIdx].Name())
 			writeToClipboard(s)
 		}
-	
+
 	case 'G':
 		selectedIdx = len(files) - 1
 
 		_, screenHeight := screen.Size()
 		heightUsableForFiles := max(screenHeight-3, 1)
 		scrollOffset = max((len(files)-1)-(heightUsableForFiles-1), 0)
+
+	case 'n':
+		if previousKeyPressed == 'c' && selectedIdx < len(files) {
+			writeToClipboard(files[selectedIdx].Name())
+		}
 	}
 
 	switch ev.Key() {
 	case tcell.KeyUp:
 		handleKeyPressUp()
-		
+
 	case tcell.KeyDown:
 		handleKeyPressDown()
-		
+
 	case tcell.KeyLeft:
 		handleKeyPressLeft(config)
-		
+
 	case tcell.KeyRight:
 		handleKeyPressRight(config)
-	
+
 	case tcell.KeyCtrlD:
 		if selectedIdx >= len(files)-1 {
 			break
@@ -667,7 +672,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 		}
 
 		scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
-		
+
 	case tcell.KeyESC:
 		if currSearchEntry != "" {
 			currSearchEntry = ""
@@ -682,7 +687,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
 	switch ev.Key() {
 	case tcell.KeyRune:
-	
+
 		// When in search mode, make sure the marker is at the top of the list.
 		// Since the marker should be at the top, the pane should be drawn as if
 		// both the selected index and the scroll offset are 0.
@@ -690,7 +695,7 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 			selectedIdx = 0
 			scrollOffset = 0
 		}
-		
+
 		currSearchEntry = currSearchEntry + string(ev.Rune())
 		matches, err := searchInDir(currSearchEntry, files)
 		if err != nil {
@@ -721,7 +726,7 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 	case tcell.KeyCR:
 		currMode = ModeDefault
 
-		if strings.TrimSpace(currSearchEntry) == ""  {
+		if strings.TrimSpace(currSearchEntry) == "" {
 			handleDirectoryChange(currPath, config)
 			break
 		}
@@ -752,7 +757,7 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 				// TODO: Log error in screen.
 				break
 			}
-			
+
 			positionHistory[currPath] = index
 			newPath := filepath.Join(currPath, firstMatch.Name())
 			handleDirectoryChange(newPath, config)
@@ -791,11 +796,11 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 func handleKeyPressInRecordingMark(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
 	result := keyHandlingResult{}
 	currMode = ModeDefault
-	
+
 	if ev.Key() == tcell.KeyESC {
 		return result, nil
 	}
-	
+
 	if ev.Key() != tcell.KeyRune {
 		return result, errors.New("setting mark: value for mark must be a rune")
 	}
@@ -807,40 +812,40 @@ func handleKeyPressInRecordingMark(ev *tcell.EventKey, config *conf.Config) (key
 
 	currMode = ModeDefault
 	result.addingNewMark = true
-	
+
 	return result, nil
 }
 
 func handleKeyPressInListeningForMark(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
 	result := keyHandlingResult{}
 	currMode = ModeDefault
-	
+
 	if ev.Key() == tcell.KeyESC {
 		return result, nil
 	}
-	
+
 	if ev.Key() != tcell.KeyRune {
 		return result, errors.New("listening for mark: value for mark must be a rune")
 	}
-	
+
 	r := ev.Rune()
 	path, ok := marks[r]
 	if !ok {
 		return result, errors.New(fmt.Sprintf("listening for mark: %q is not set", r))
 	}
-	
+
 	f, err := os.Open(path)
 	if err != nil {
 		return result, errors.New(fmt.Sprintf("%q is not a valid file", f.Name()))
 	}
 	defer f.Close()
-	
+
 	currPath = path
 	handleDirectoryChange(currPath, config)
 	selectedIdx = 0
 	scrollOffset = 0
 	currSearchEntry = ""
-	
+
 	return result, nil
 }
 
@@ -887,7 +892,7 @@ func handleKeyPressLeft(config *conf.Config) {
 
 func handleKeyPressRight(config *conf.Config) {
 	currSearchEntry = ""
-	
+
 	if selectedIdx < len(files) && files[selectedIdx].IsDir() {
 		parentScrollOffset = scrollOffset
 		positionHistory[currPath] = selectedIdx
@@ -911,7 +916,7 @@ func storeNewMark(r rune, path string, config *conf.Config) error {
 		return err
 	}
 	defer f.Close()
-	
+
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		l := scanner.Text()
@@ -920,16 +925,16 @@ func storeNewMark(r rune, path string, config *conf.Config) error {
 			slog.Debug("Found invalid line in mark file: %v", l)
 			continue
 		}
-		
+
 		if string(r) == parts[0] {
 			return errors.New(fmt.Sprintf("recording mark: rune %q is already used", r))
 		}
 	}
-	
+
 	if err = scanner.Err(); err != nil {
 		return err
 	}
-	
+
 	line := fmt.Sprintf("%c %s\n", r, path)
 	_, err = f.WriteString(line)
 	if err != nil {
@@ -1038,23 +1043,23 @@ func render(keyChangesChan chan *tcell.EventKey, errorChan chan error, config *c
 			slog.Debug("render: processing...", "keyRune", eventKey.Rune(), "keyString", string(eventKey.Rune()), "currMode", currMode, "selectedIdx", selectedIdx)
 
 			switch currMode {
-				case ModeDefault: 
-					drawFileList(screen, config)
-					drawInfoLine(screen)
-					
-				case ModeSearch: 
-					drawFileList(screen, config)
-					drawInfoLine(screen)
-				
-				case ModeRecordingMark:
-					drawFileList(screen, config)
-					drawFullLine(screen, "Listening for mark...", StyleAttention)
-					
-				case ModeListeningForMark:
-					drawFileList(screen, config)
-					drawMarkHintSection(screen, config)
+			case ModeDefault:
+				drawFileList(screen, config)
+				drawInfoLine(screen)
+
+			case ModeSearch:
+				drawFileList(screen, config)
+				drawInfoLine(screen)
+
+			case ModeRecordingMark:
+				drawFileList(screen, config)
+				drawFullLine(screen, "Listening for mark...", StyleAttention)
+
+			case ModeListeningForMark:
+				drawFileList(screen, config)
+				drawMarkHintSection(screen, config)
 			}
-			
+
 			screen.Show()
 
 		case err := <-errorChan:
@@ -1079,12 +1084,12 @@ func getEntryIndexFromPath(path, entryToLookFor string) (int, bool) {
 		slog.Debug("failed to read directory entries", "err", err, "currPath", currPath)
 		return -1, false
 	}
-	
+
 	for i, entry := range pathEntries {
 		if entry.Name() == entryToLookFor {
 			return i, true
 		}
 	}
-	
+
 	return -1, false
 }
