@@ -457,12 +457,10 @@ func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions v4, selecte
 }
 
 func drawInfoLine(screen tcell.Screen) {
-	w, h := screen.Size()
-	drawText(
+	drawFullLine(
 		screen,
-		v4{0, h - 1, w, h - 1},
-		StyleInfo,
 		"(j/k: up/down) (l: enter) (h: parent) (/: search) (. hidden) (q: quit) (m: set bookmark) (': go to bookmark)",
+		StyleInfo,
 	)
 }
 
