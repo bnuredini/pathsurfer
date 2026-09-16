@@ -2,11 +2,10 @@
 
 A tiny terminal utility for fast directory navigating.
 
-<p align="center">
+<div align="center">
   <img src="https://github.com/bnuredini/pathsurfer/blob/master/docs/imgs/screenshot1.png" alt="pathsurfer screenshot" width="80%">
-</p>
-
-*this is **pre-alpha software**: expect active development and behavior change at any time.*
+  <p><i>this is <b>pre-alpha software</b>: expect active development and behavior change at any time.</i></p>
+</div>
 
 ---
 
