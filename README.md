@@ -6,13 +6,11 @@ A tiny terminal utility for fast directory navigating.
   <img src="https://github.com/bnuredini/pathsurfer/blob/master/docs/imgs/screenshot1.png" alt="pathsurfer screenshot" width="80%">
 </p>
 
+*this is **pre-alpha software**: expect active development and behavior change at any time.*
+
 ---
 
 ## Features
-
-> **Warning.**
->
-> This is **pre-alpha software**. It's under active development and behavior may change at any time.
 
 * Directory navigation
 * Fuzzy finding
@@ -55,7 +53,7 @@ curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsu
 ## Keybindings
 
 | Action              | Key               | Description                                                   |
-| ------------------- | --------------    | ------------------------------------------------------------- |
+| ------------------- | ----------------- | ------------------------------------------------------------- |
 | Move up             | <kbd>k</kbd>      | Move up in the file list                                      |
 | Move down           | <kbd>j</kbd>      | Move down in the file list                                    |
 | Go back             | <kbd>h</kbd>      | Go back one directory                                         |
@@ -63,7 +61,6 @@ curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsu
 | Search              | <kbd>/</kbd>      | Enter search mode                                             |
 | Toggle hidden files | <kbd>.</kbd>      | Toggle hidden files in list                                   |
 | Quit                | <kbd>q</kbd>      | Quits the program                                             |
-| Exit search         | <kbd>ESC</kbd>    | Exists out of search mode                                     |
 | Record bookamark    | <kbd>m</kbd>      | Prompts for a key to be associated with the current directory |
 | Go to bookamark     | <kbd>'</kbd>      | Prompts for a bookmarked key                                  |
 | Go to top           | <kbd>gg</kbd>     | Move the cursor at the top of the list                        |
@@ -72,30 +69,35 @@ curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsu
 
 ## Search mode
 
-| Action              | Key                  | Description                                                   |
-| ------------------- | --------------       | ------------------------------------------------------------- |
-| Enter directory     | <kbd>TAB</kbd>       | Enter in to the directory showing up as the top search result |
-| Go back directory   | <kbd>Shift+TAB</kbd> | Go back one directory                                         |
-| Escape              | <kbd>ESC</kbd>       | Escape out of search mode                                     |
+| Action              | Key                  | Description                                                          |
+| ------------------- | -------------------- | -------------------------------------------------------------        |
+| Confirm search      | <kbd>Enter</kbd>     | Escape out of search mode and view the results of the search pattern |
+| Enter top directory | <kbd>TAB</kbd>       | Enter in to the directory showing up as the top search result        |
+| Go back             | <kbd>Shift+TAB</kbd> | Go back one directory                                                |
+| Escape              | <kbd>ESC</kbd>       | Escape out of search mode                                            |
 
 ## Building locally
 
 Building and integrating pathsurfer is easy: using Make, you'll just need to run one command to
-build the binary and two more commands for installing and integrating with your shell.
+build the binary and one command to integrate with your shell.
 
 ### Option #1: Building locally with `make`
 
-From the project's root, run the following:
+To build and install, run:
 
 ```bash
 make install
 ```
 
+If you just need to build the binary, run `make build`.
+
 Depending on which shell you use, run one of the following to integrate pathsurfer with your shell:
 
-- If you use bash, run `make integrate/bash`
-- If you use zsh, run `make integrate/zsh`
-- If you use fish, run `make integrate/fish`
+| Shell | Command               |
+| ----- | --------------------- |
+| bash  | `make integrate/bash` |
+| zsh   | `make integrate/zsh`  |
+| fish  | `make integrate/fish` |
 
 Shell integration is what allows you to change directories when quitting the program.
 
@@ -121,20 +123,15 @@ To integrate with fish, run:
 install -m 644 ./scripts/psurf.fish ~/.config/fish/conf.d/psurf.fish
 ```
 
-## Keybindings
+## Contributions
 
-| Action              | Key            | Description                 |
-|---------------------|----------------|-----------------------------|
-| Move up             | <kbd>k</kbd>   | Move up in the file list    |
-| Move down           | <kbd>j</kbd>   | Move down in the file list  |
-| Go back             | <kbd>h</kbd>   | Go back one directory       |
-| Go forward          | <kbd>l</kbd>   | Change into a directory     |
-| Search              | <kbd>/</kbd>   | Enter search mode           |
-| Toggle hidden files | <kbd>.</kbd>   | Toggle hidden files in list |
-| Quit                | <kbd>q</kbd>   | Quits the program           |
-| Exit search         | <kbd>ESC</kbd> | Exists out of search mode   |
+Pull requests aren't reviewed due to time constraints, but feel free to open issues though.
 
 ## License
 
-This project is released under the MIT license. For more information, see the 
+This project is released under the MIT license. For more information, see the
 [LICENSE](./LICENSE) file.
+
+---
+
+_Everything hand-written: code, docs, and typos._
