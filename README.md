@@ -66,6 +66,7 @@ curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsu
 | Record bookamark    | <kbd>m</kbd>      | Prompts for a key to be associated with the current directory |
 | Go to bookamark     | <kbd>'</kbd>      | Prompts for a bookmarked key                                  |
 | Go to top           | <kbd>gg</kbd>     | Move the cursor at the top of the list                        |
+| Go to bottom        | <kbd>G</kbd>      | Move the cursor at the bottom of the list                     |
 | Big move up         | <kbd>CTRL+u</kbd> | Move the cursor 22 rows up                                    |
 | Big move down       | <kbd>CTRL+d</kbd> | Move the cursor 22 rows down                                  |
 
