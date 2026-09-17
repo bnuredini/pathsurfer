@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"syscall"
@@ -75,7 +74,7 @@ var (
 	// It makes sense to use this value only if waitingForAnotherKeyPress is
 	// true. The purpose of these to variables is to add support for Vi-like
 	// keybindings such as gg.
-	previousKeyPressed        rune
+	previousKeyPressed        string
 	waitingForAnotherKeyPress bool
 
 	marks map[rune]string
@@ -107,9 +106,19 @@ var KeysThatTriggerRedrawInDefault = []tcell.Key{
 	tcell.KeyESC,
 }
 
-var ChainableKeybindings = map[rune][]rune{
-	'g': []rune{'g'},
-	'c': []rune{'c', 'n'},
+type keybinding struct {
+	key string
+	description string
+}
+
+var ChainableKeybindings = map[string][]keybinding{
+	"g": []keybinding{
+		keybinding{key: "g", description: "Go to top"},
+	},
+	"c": []keybinding{
+		keybinding{key: "c", description: "Copy file path"}, 
+		keybinding{key: "n", description: "Copy file name"},
+	},
 }
 
 func main() {
@@ -492,6 +501,23 @@ func drawMarkHintSection(screen tcell.Screen, config *conf.Config) {
 	}
 }
 
+func drawHintSection(screen tcell.Screen, config *conf.Config, keybindings []keybinding) {
+	w, h := screen.Size()
+	
+	index := len(keybindings) - 1
+	for _, k := range keybindings {
+		dimensions := v4{0, (h - 1) - index, w, (h - 1) - index}
+		drawText(
+			screen,
+			dimensions,
+			StyleInfo,
+			fmt.Sprintf("%c\t->\t%s", k.key, k.description),
+		)
+
+		index--
+	}
+}
+
 func drawText(screen tcell.Screen, dimensions v4, style tcell.Style, text string) {
 	currCol := dimensions.x1
 	currRow := dimensions.y1
@@ -564,9 +590,9 @@ func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult,
 func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
 	result := keyHandlingResult{}
 
-	if waitingForAnotherKeyPress && !canKeyPressesBeChained(previousKeyPressed, ev.Rune()) {
+	if waitingForAnotherKeyPress && !canKeyPressesBeChained(previousKeyPressed, string(ev.Rune())) {
 		// CLEANUP: Find a better reset value.
-		previousKeyPressed = ' '
+		previousKeyPressed = " "
 		waitingForAnotherKeyPress = false
 	}
 
@@ -607,11 +633,11 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 	case 'g':
 		if !waitingForAnotherKeyPress {
 			waitingForAnotherKeyPress = true
-			previousKeyPressed = 'g'
+			previousKeyPressed = "g"
 			break
 		}
 
-		if previousKeyPressed == 'g' {
+		if previousKeyPressed == "g" {
 			selectedIdx = 0
 			scrollOffset = 0
 		}
@@ -621,11 +647,11 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 	case 'c':
 		if !waitingForAnotherKeyPress {
 			waitingForAnotherKeyPress = true
-			previousKeyPressed = 'c'
+			previousKeyPressed = "c"
 			break
 		}
 
-		if previousKeyPressed == 'c' {
+		if previousKeyPressed == "c" {
 			s := filepath.Join(currPath, files[selectedIdx].Name())
 			writeToClipboard(s)
 		}
@@ -638,7 +664,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 		scrollOffset = max((len(files)-1)-(heightUsableForFiles-1), 0)
 
 	case 'n':
-		if previousKeyPressed == 'c' && selectedIdx < len(files) {
+		if previousKeyPressed == "c" && selectedIdx < len(files) {
 			writeToClipboard(files[selectedIdx].Name())
 		}
 	}
@@ -1044,8 +1070,7 @@ func render(keyChangesChan chan *tcell.EventKey, errorChan chan error, config *c
 
 			switch currMode {
 			case ModeDefault:
-				drawFileList(screen, config)
-				drawInfoLine(screen)
+				renderForDefaultMode(screen, config)
 
 			case ModeSearch:
 				drawFileList(screen, config)
@@ -1069,13 +1094,33 @@ func render(keyChangesChan chan *tcell.EventKey, errorChan chan error, config *c
 	}
 }
 
-func canKeyPressesBeChained(key1, key2 rune) bool {
+func renderForDefaultMode(screen tcell.Screen, config *conf.Config) {
+	drawFileList(screen, config)
+	if !waitingForAnotherKeyPress {
+		drawInfoLine(screen)
+	} else {
+		keybindings, ok := ChainableKeybindings["c"]
+		if ok {
+			drawHintSection(screen, config, keybindings)
+		} else {
+			drawInfoLine(screen)
+		}
+	}
+}
+
+func canKeyPressesBeChained(key1, key2 string) bool {
 	chainableWithKey1, ok := ChainableKeybindings[key1]
 	if !ok {
 		return false
 	}
 
-	return slices.Contains(chainableWithKey1, key2)
+	for _, k := range chainableWithKey1 {
+		if k.key == key2 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func getEntryIndexFromPath(path, entryToLookFor string) (int, bool) {
