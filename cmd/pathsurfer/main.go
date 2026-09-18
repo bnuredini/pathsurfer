@@ -511,7 +511,7 @@ func drawHintSection(screen tcell.Screen, config *conf.Config, keybindings []key
 			screen,
 			dimensions,
 			StyleInfo,
-			fmt.Sprintf("%c\t->\t%s", k.key, k.description),
+			fmt.Sprintf("%s\t->\t%s", k.key, k.description),
 		)
 
 		index--
@@ -655,6 +655,8 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 			s := filepath.Join(currPath, files[selectedIdx].Name())
 			writeToClipboard(s)
 		}
+		
+		waitingForAnotherKeyPress = false
 
 	case 'G':
 		selectedIdx = len(files) - 1
@@ -1099,7 +1101,7 @@ func renderForDefaultMode(screen tcell.Screen, config *conf.Config) {
 	if !waitingForAnotherKeyPress {
 		drawInfoLine(screen)
 	} else {
-		keybindings, ok := ChainableKeybindings["c"]
+		keybindings, ok := ChainableKeybindings[previousKeyPressed]
 		if ok {
 			drawHintSection(screen, config, keybindings)
 		} else {
