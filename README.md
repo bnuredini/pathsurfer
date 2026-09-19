@@ -2,7 +2,7 @@
 
 A tiny terminal utility for fast directory navigating.
 
-Built to work out of the box with sensible defaults and support for fuzzy finding, Vi-like
+Built to work out of the box with sensible defaults, support for fuzzy finding, Vi-like
 keybindings, and shell integration.
 
 <div align="center">
@@ -49,10 +49,11 @@ Windows:
 curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-windows-amd64-.tar.gz | tar xz
 ./pathsurfer-windows-amd64.tar.gz wizard
 ```
-
 -->
 
 ## Keybindings
+
+### Default mode
 
 | Action              | Key               | Description                                                   |
 | ------------------- | ----------------- | ------------------------------------------------------------- |
@@ -70,7 +71,7 @@ curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsu
 | Big move up         | <kbd>CTRL+u</kbd> | Move the cursor 22 rows up                                    |
 | Big move down       | <kbd>CTRL+d</kbd> | Move the cursor 22 rows down                                  |
 
-## Search mode
+### Search mode
 
 | Action              | Key                  | Description                                                          |
 | ------------------- | -------------------- | -------------------------------------------------------------        |
@@ -92,7 +93,7 @@ To build and install, run:
 make install
 ```
 
-If you just need to build the binary, run `make build`.
+(If you just need to build the binary, run `make build`.)
 
 Depending on which shell you use, run one of the following to integrate pathsurfer with your shell:
 
@@ -111,7 +112,7 @@ If you don't have `make` in your system, you can build by using the Go toolchain
 ```bash
 go build ./cmd/pathsurfer
 mkdir -p ~/.local/bin
-install -m 644 ./bin/pathsurfer ~/.local/bin/pathsurfer
+install -m 744 ./build/pathsurfer ~/.local/bin/pathsurfer
 ```
 
 To integrate with bash or zsh, add this line to your `.bashrc`/`.zshrc`:
@@ -132,8 +133,7 @@ Pull requests aren't reviewed due to time constraints, but feel free to open iss
 
 ## License
 
-This project is released under the MIT license. For more information, see the
-[LICENSE](./LICENSE) file.
+The source code is released under the MIT license.
 
 ---
 
