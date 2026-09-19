@@ -25,12 +25,12 @@ script_install_dir          = $(HOME)/.local/share/pathsurfer/functions
 bashrc = $(HOME)/.bashrc
 zshrc  = $(HOME)/.zshrc
 
-## build: build the application
+## build: build pathsurfer 
 .PHONY: build
 build:
 	CGO_ENABLED=0 go build -ldflags=${linker_flags} -o=${binary_path}${binary_extension} ${main_package_path}
 
-## install: install the application
+## install: install pathsurfer
 .PHONY: install
 install: build
 	@echo "Installing the binary to $(install_path)..."
@@ -130,3 +130,9 @@ run/live:
 		--watch go.mod \
 		--watch go.sum \
 		--exts go -- "make build && ${binary_path}${binary_extension}"
+
+## help: print this help message
+.PHONY: help
+help:
+	@echo 'Usage:'
+	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' |  sed -e 's/^/ /'
