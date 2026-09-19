@@ -78,6 +78,8 @@ var (
 	waitingForAnotherKeyPress bool
 
 	marks map[rune]string
+
+	shouldDisplayHelpSection bool
 )
 
 var (
@@ -228,7 +230,7 @@ func main() {
 	}
 	handleDirectoryChange(currPath, config)
 	drawFileList(screen, config)
-	drawInfoLine(screen)
+	drawShortInfoLine(screen)
 
 	keyEnteredChan := make(chan *tcell.EventKey)
 	errorChan := make(chan error)
@@ -242,7 +244,7 @@ func main() {
 		case *tcell.EventResize:
 			screen.Sync()
 			drawFileList(screen, config)
-			drawInfoLine(screen)
+			drawShortInfoLine(screen)
 			screen.Show()
 
 		case *tcell.EventKey:
@@ -465,14 +467,6 @@ func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions v4, selecte
 	}
 }
 
-func drawInfoLine(screen tcell.Screen) {
-	drawFullLine(
-		screen,
-		"(j/k: up/down) (l: enter) (h: parent) (/: search) (. hidden) (q: quit) (m: set bookmark) (': go to bookmark)",
-		StyleInfo,
-	)
-}
-
 func drawMarkHintSection(screen tcell.Screen, config *conf.Config) {
 	w, h := screen.Size()
 
@@ -535,11 +529,20 @@ func drawText(screen tcell.Screen, dimensions v4, style tcell.Style, text string
 	}
 }
 
-func drawFullLine(screen tcell.Screen, text string, style tcell.Style) {
-	w, h := screen.Size()
+func drawShortInfoLine(screen tcell.Screen) {
+	drawStatusLine(screen, HelpMessageShort, StyleInfo)
+}
+
+func drawStatusLine(screen tcell.Screen, text string, style tcell.Style) {
+	_, h := screen.Size()
+	drawFullLine(screen, h, text, style)
+}
+
+func drawFullLine(screen tcell.Screen, y int, text string, style tcell.Style) {
+	w, _ := screen.Size()
 	col := 0
 	for _, r := range text {
-		screen.SetContent(col, h-1, r, nil, style)
+		screen.SetContent(col, y, r, nil, style)
 
 		if col >= w-1 {
 			break
@@ -548,9 +551,36 @@ func drawFullLine(screen tcell.Screen, text string, style tcell.Style) {
 	}
 
 	for col < w {
-		screen.SetContent(col, h-1, ' ', nil, style)
+		screen.SetContent(col, y, ' ', nil, style)
 		col++
 	}
+}
+
+func drawHelpSection(screen tcell.Screen) {
+	// TODO: Find new lines and use that for the index.
+	_, h := screen.Size()
+	numLines := strings.Count(HelpMessage, "\n")
+	if len(HelpMessage) > 0 && !strings.HasSuffix(HelpMessage, "\n") {
+		numLines++
+	}
+	y := h - numLines
+	scanner := bufio.NewScanner(strings.NewReader(HelpMessage))
+	
+	for scanner.Scan() {
+		l := scanner.Text()
+		drawFullLine(screen, y, l, StyleInfo)
+
+		y++
+		if y >= h {
+			break
+		}
+	}
+	
+	if err := scanner.Err(); err != nil {
+		slog.Error("encountered an error while reading help message", "err", err)
+	}
+	/*
+	*/
 }
 
 type keyHandlingResult struct {
@@ -591,7 +621,9 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 	result := keyHandlingResult{}
 
 	if waitingForAnotherKeyPress && !canKeyPressesBeChained(previousKeyPressed, string(ev.Rune())) {
-		// CLEANUP: Find a better reset value.
+		// CLEANUP: Find a better reset value. With this reset value and with
+		// the fact that we're using ev.Rune(), users can't use the spacebar for
+		// chainable keybindings.
 		previousKeyPressed = " "
 		waitingForAnotherKeyPress = false
 	}
@@ -669,7 +701,12 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 		if previousKeyPressed == "c" && selectedIdx < len(files) {
 			writeToClipboard(files[selectedIdx].Name())
 		}
+
+	case '?':
+		slog.Info("temp: opening help...")
+		shouldDisplayHelpSection = true
 	}
+	
 
 	switch ev.Key() {
 	case tcell.KeyUp:
@@ -707,6 +744,8 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 			searchBarPrefix = SearchBarPrefixNavigating
 			handleDirectoryChange(currPath, config)
 		}
+
+		shouldDisplayHelpSection = false
 	}
 
 	return result, nil
@@ -1076,11 +1115,11 @@ func render(keyChangesChan chan *tcell.EventKey, errorChan chan error, config *c
 
 			case ModeSearch:
 				drawFileList(screen, config)
-				drawInfoLine(screen)
+				drawShortInfoLine(screen)
 
 			case ModeRecordingMark:
 				drawFileList(screen, config)
-				drawFullLine(screen, "Listening for mark...", StyleAttention)
+				drawStatusLine(screen, "Listening for mark...", StyleAttention)
 
 			case ModeListeningForMark:
 				drawFileList(screen, config)
@@ -1090,7 +1129,7 @@ func render(keyChangesChan chan *tcell.EventKey, errorChan chan error, config *c
 			screen.Show()
 
 		case err := <-errorChan:
-			drawFullLine(screen, err.Error(), StyleError)
+			drawStatusLine(screen, err.Error(), StyleError)
 			screen.Show()
 		}
 	}
@@ -1098,16 +1137,22 @@ func render(keyChangesChan chan *tcell.EventKey, errorChan chan error, config *c
 
 func renderForDefaultMode(screen tcell.Screen, config *conf.Config) {
 	drawFileList(screen, config)
-	if !waitingForAnotherKeyPress {
-		drawInfoLine(screen)
-	} else {
+	
+	if waitingForAnotherKeyPress {
 		keybindings, ok := ChainableKeybindings[previousKeyPressed]
 		if ok {
 			drawHintSection(screen, config, keybindings)
 		} else {
-			drawInfoLine(screen)
+			drawShortInfoLine(screen)
 		}
+		
+		return 
+	} else if shouldDisplayHelpSection {
+		drawHelpSection(screen)
+		return
 	}
+	
+	drawShortInfoLine(screen)
 }
 
 func canKeyPressesBeChained(key1, key2 string) bool {
