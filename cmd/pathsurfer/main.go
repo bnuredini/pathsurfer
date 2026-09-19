@@ -703,7 +703,6 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 		}
 
 	case '?':
-		slog.Info("temp: opening help...")
 		shouldDisplayHelpSection = true
 	}
 	
@@ -819,7 +818,7 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 
 		firstMatch := files[0]
 		if firstMatch.IsDir() {
-			index, indexFound := getEntryIndexFromPath(currPath, firstMatch.Name())
+			index, indexFound := getEntryIndexFromPath(currPath, firstMatch.Name(), config)
 			if !indexFound {
 				// TODO: Log error in screen.
 				break
@@ -846,15 +845,7 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 		currSearchEntry = ""
 
 	case tcell.KeyBacktab:
-		parentPath := filepath.Dir(filepath.Clean(currPath))
-		if currPath != parentPath {
-			currPath = parentPath
-		}
-
-		handleDirectoryChange(currPath, config)
-		selectedIdx = 0
-		scrollOffset = 0
-		currSearchEntry = ""
+		handleKeyPressLeft(config)
 	}
 
 	return keyHandlingResult{shouldQuit: false, newPath: ""}, nil
@@ -941,20 +932,19 @@ func handleKeyPressLeft(config *conf.Config) {
 	newPath := filepath.Dir(currPath)
 	currPath = newPath
 	currSearchEntry = ""
-
+	
 	indexFromHistory, ok := positionHistory[newPath]
 	if !ok {
-		handleDirectoryChange(currPath, config)
-
 		for i, f := range files {
 			if f.Name() == filepath.Base(oldPath) {
 				selectedIdx = i
 			}
 		}
 	} else {
-		handleDirectoryChange(currPath, config)
 		selectedIdx = indexFromHistory
 	}
+	
+	handleDirectoryChange(currPath, config)
 }
 
 func handleKeyPressRight(config *conf.Config) {
@@ -1107,7 +1097,7 @@ func render(keyChangesChan chan *tcell.EventKey, errorChan chan error, config *c
 	for {
 		select {
 		case eventKey := <-keyChangesChan:
-			slog.Debug("render: processing...", "keyRune", eventKey.Rune(), "keyString", string(eventKey.Rune()), "currMode", currMode, "selectedIdx", selectedIdx)
+			slog.Debug("render", "keyRune", eventKey.Rune(), "keyString", string(eventKey.Rune()), "currMode", currMode, "positionHistory", positionHistory)
 
 			switch currMode {
 			case ModeDefault:
@@ -1170,17 +1160,24 @@ func canKeyPressesBeChained(key1, key2 string) bool {
 	return false
 }
 
-func getEntryIndexFromPath(path, entryToLookFor string) (int, bool) {
+func getEntryIndexFromPath(path, entryToLookFor string, config *conf.Config) (int, bool) {
 	pathEntries, err := os.ReadDir(path)
 	if err != nil {
 		slog.Debug("failed to read directory entries", "err", err, "currPath", currPath)
 		return -1, false
 	}
 
-	for i, entry := range pathEntries {
-		if entry.Name() == entryToLookFor {
-			return i, true
+	index := 0
+	for _, entry := range pathEntries {
+		if !config.ShowHiddenFiles && strings.HasPrefix(entry.Name(), "."){
+			continue
 		}
+		
+		if entry.Name() == entryToLookFor {
+			return index, true
+		}
+		
+		index++
 	}
 
 	return -1, false
