@@ -55,7 +55,7 @@ func Init() (*Config, error) {
 	flag.Usage = func() {
 		cliOutput := flag.CommandLine.Output()
 
-		fmt.Fprintln(cliOutput, "psurf - change directories quickly")
+		fmt.Fprintln(cliOutput, "psurf - a tiny terminal utility for fast directory navigating")
 		fmt.Fprintln(cliOutput, "")
 		fmt.Fprintln(cliOutput, "Usage:")
 		fmt.Fprintln(cliOutput, "  psurf [options] [path]")
