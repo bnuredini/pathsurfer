@@ -55,21 +55,21 @@ curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsu
 
 ### Default mode
 
-| Action              | Key               | Description                                                   |
-| ------------------- | ----------------- | ------------------------------------------------------------- |
-| Move up             | <kbd>k</kbd>      | Move up in the file list                                      |
-| Move down           | <kbd>j</kbd>      | Move down in the file list                                    |
-| Go back             | <kbd>h</kbd>      | Go back one directory                                         |
-| Go forward          | <kbd>l</kbd>      | Change into a directory                                       |
-| Search              | <kbd>/</kbd>      | Enter search mode                                             |
-| Toggle hidden files | <kbd>.</kbd>      | Toggle hidden files in list                                   |
-| Quit                | <kbd>q</kbd>      | Quits the program                                             |
-| Record bookamark    | <kbd>m</kbd>      | Prompts for a key to be associated with the current directory |
-| Go to bookamark     | <kbd>'</kbd>      | Prompts for a bookmarked key                                  |
-| Go to top           | <kbd>gg</kbd>     | Move the cursor at the top of the list                        |
-| Go to bottom        | <kbd>G</kbd>      | Move the cursor at the bottom of the list                     |
-| Big move up         | <kbd>CTRL+u</kbd> | Move the cursor 22 rows up                                    |
-| Big move down       | <kbd>CTRL+d</kbd> | Move the cursor 22 rows down                                  |
+| Action              | Key                              | Description                                                   |
+| ------------------- | -------------------------------- | ------------------------------------------------------------- |
+| Move down           | <kbd>j</kbd> / <kbd>&darr;</kbd> | Move down in the file list                                    |
+| Move up             | <kbd>k</kbd> / <kbd>&uarr;</kbd>  | Move up in the file list                                      |
+| Go back             | <kbd>h</kbd> / <kbd>&larr;</kbd> | Go back one directory                                         |
+| Go forward          | <kbd>l</kbd> / <kbd>&rarr;</kbd> | Change into a directory                                       |
+| Search              | <kbd>/</kbd>                     | Enter search mode                                             |
+| Toggle hidden files | <kbd>.</kbd>                     | Toggle hidden files in list                                   |
+| Quit                | <kbd>q</kbd>                     | Quits the program                                             |
+| Record bookamark    | <kbd>m</kbd>                     | Prompts for a key to be associated with the current directory |
+| Go to bookamark     | <kbd>'</kbd>                     | Prompts for a bookmarked key                                  |
+| Go to top           | <kbd>gg</kbd>                    | Move the cursor at the top of the list                        |
+| Go to bottom        | <kbd>G</kbd>                     | Move the cursor at the bottom of the list                     |
+| Big move up         | <kbd>CTRL+u</kbd>                | Move the cursor 22 rows up                                    |
+| Big move down       | <kbd>CTRL+d</kbd>                | Move the cursor 22 rows down                                  |
 
 ### Search mode
 
