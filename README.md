@@ -127,6 +127,19 @@ To integrate with fish, run:
 install -m 644 ./scripts/psurf.fish ~/.config/fish/conf.d/psurf.fish
 ```
 
+<details>
+<summary>Cleaning up</summary>
+
+Run:
+
+```
+make uninstall
+```
+
+and `make disintegrate/bash`, `make disintegrate/zsh`, or `make disintegrate/fish` depending on
+which shell integration you installed.
+</details>
+
 ## Contributions
 
 Pull requests aren't reviewed due to time constraints, but feel free to open issues though.
