@@ -87,31 +87,31 @@ uninstall:
 	rm -f $(install_path)
 	@echo "Uninstallation completed"
 
-## uninstall/fish: remove fish integration
-.PHONY: uninstall/fish
-uninstall/fish:
+## disintegrate/fish: remove fish integration
+.PHONY: disintegrate/fish
+disintegrate/fish:
 	@echo "Removing $(script_install_dir_for_fish)/psurf.fish..."
 	rm -f $(script_install_dir_for_fish)/psurf.fish
 	rm -f $(script_install_dir_for_fish)/psurf_keybindings.fish
-	@printf "\nUninstallation completed. Close your shell session and open it back again."
+	@printf "\nFish clean-up completed. Close your shell session and open it back again."
 
-## uninstall/bash: remove the psurf shell script for bash
-.PHONY: uninstall/bash
-uninstall/bash:
+## disintegrate/bash: remove the psurf shell script for bash
+.PHONY: disintegrate/bash
+disintegrate/bash:
 	@echo "Removing $(script_install_dir)/psurf.sh..."
 	rm -f $(script_install_dir)/psurf.sh
 	sed -i '\|# Load psurf shell function|d' $(bashrc) || true
 	sed -i '\|source $(script_install_dir)/psurf.sh|d' $(bashrc) || true
-	@printf "\nUninstallation completed. Close your shell session and open it back again."
+	@printf "\nBash clean-up completed. Close your shell session and open it back again."
 
-## uninstall/zsh: remove the psurf shell script for zsh
-.PHONY: uninstall/zsh
-uninstall/zsh:
+## disintegrate/zsh: remove the psurf shell script for zsh
+.PHONY: disintegrate/zsh
+disintegrate/zsh:
 	@echo "Removing $(script_install_dir)/psurf.sh..."
 	rm -f $(script_install_dir)/psurf.sh
 	sed -i '\|# Load psurf shell function|d' $(zshrc) || true
 	sed -i '\|source $(script_install_dir)/psurf.sh|d' $(zshrc) || true
-	@printf "\nUninstallation completed. Close your shell session and open it back again."
+	@printf "\nZsh clean-up completed. Close your shell session and open it back again."
 
 ## run: run the binary
 .PHONY: run
