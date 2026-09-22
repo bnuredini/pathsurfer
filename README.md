@@ -8,9 +8,7 @@ A tiny terminal utility for fast directory navigating.
 Built to work out of the box with sensible defaults, support for fuzzy finding, Vi-like
 keybindings, and shell integration.
 
-<div align="center">
-  <img src="https://github.com/bnuredini/pathsurfer/blob/master/docs/imgs/screenshot1.png" alt="pathsurfer screenshot" width="80%">
-</div>
+<img src="https://github.com/bnuredini/pathsurfer/blob/master/docs/imgs/screenshot1.png" alt="pathsurfer screenshot">
 
 ---
 
