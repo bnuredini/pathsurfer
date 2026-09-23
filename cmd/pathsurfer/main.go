@@ -19,6 +19,7 @@ import (
 
 	"github.com/bnuredini/pathsurfer/internal/conf"
 	"github.com/bnuredini/pathsurfer/internal/fuzzy"
+	"github.com/bnuredini/pathsurfer/internal/stringutil"
 )
 
 type v4 struct {
@@ -109,7 +110,7 @@ var KeysThatTriggerRedrawInDefault = []tcell.Key{
 }
 
 type keybinding struct {
-	key string
+	key         string
 	description string
 }
 
@@ -118,7 +119,7 @@ var ChainableKeybindings = map[string][]keybinding{
 		keybinding{key: "g", description: "Go to top"},
 	},
 	"c": []keybinding{
-		keybinding{key: "c", description: "Copy file path"}, 
+		keybinding{key: "c", description: "Copy file path"},
 		keybinding{key: "n", description: "Copy file name"},
 	},
 }
@@ -343,6 +344,11 @@ func updateFileListing(rawFiles []fs.DirEntry, config *conf.Config) {
 	})
 }
 
+func updateFileListingWithSearch(pattern string, files []fs.DirEntry, config *conf.Config, ) {
+	matches, _ := searchInDir(currSearchEntry, files)
+	updateFileListing(matches, config)
+}
+
 func handleDirectoryChange(path string, config *conf.Config) {
 	dir, err := os.ReadDir(path)
 	if err != nil {
@@ -497,7 +503,7 @@ func drawMarkHintSection(screen tcell.Screen, config *conf.Config) {
 
 func drawHintSection(screen tcell.Screen, config *conf.Config, keybindings []keybinding) {
 	w, h := screen.Size()
-	
+
 	index := len(keybindings) - 1
 	for _, k := range keybindings {
 		dimensions := v4{0, (h - 1) - index, w, (h - 1) - index}
@@ -565,7 +571,7 @@ func drawHelpSection(screen tcell.Screen) {
 	}
 	y := h - numLines
 	scanner := bufio.NewScanner(strings.NewReader(HelpMessage))
-	
+
 	for scanner.Scan() {
 		l := scanner.Text()
 		drawFullLine(screen, y, l, StyleInfo)
@@ -575,12 +581,12 @@ func drawHelpSection(screen tcell.Screen) {
 			break
 		}
 	}
-	
+
 	if err := scanner.Err(); err != nil {
 		slog.Error("encountered an error while reading help message", "err", err)
 	}
 	/*
-	*/
+	 */
 }
 
 type keyHandlingResult struct {
@@ -687,7 +693,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 			s := filepath.Join(currPath, files[selectedIdx].Name())
 			writeToClipboard(s)
 		}
-		
+
 		waitingForAnotherKeyPress = false
 
 	case 'G':
@@ -705,7 +711,6 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 	case '?':
 		shouldDisplayHelpSection = true
 	}
-	
 
 	switch ev.Key() {
 	case tcell.KeyUp:
@@ -783,10 +788,16 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 		if len(currSearchEntry) == 1 {
 			currSearchEntry = ""
 			handleFileListingChange(currDirFiles, config)
+		} else if ev.Modifiers()&tcell.ModAlt != 0 {
+			currSearchEntry = stringutil.DeletePreviousWord(currSearchEntry)
+			if currSearchEntry == "" {
+				handleFileListingChange(currDirFiles, config)
+			} else {
+				updateFileListingWithSearch(currSearchEntry, currDirFiles, config)
+			}
 		} else {
 			currSearchEntry = currSearchEntry[:len(currSearchEntry)-1]
-			matches, _ := searchInDir(currSearchEntry, currDirFiles)
-			updateFileListing(matches, config)
+			updateFileListingWithSearch(currSearchEntry, currDirFiles, config)
 		}
 
 	case tcell.KeyCR:
@@ -932,7 +943,7 @@ func handleKeyPressLeft(config *conf.Config) {
 	newPath := filepath.Dir(currPath)
 	currPath = newPath
 	currSearchEntry = ""
-	
+
 	indexFromHistory, ok := positionHistory[newPath]
 	if !ok {
 		for i, f := range files {
@@ -943,7 +954,7 @@ func handleKeyPressLeft(config *conf.Config) {
 	} else {
 		selectedIdx = indexFromHistory
 	}
-	
+
 	handleDirectoryChange(currPath, config)
 }
 
@@ -1127,7 +1138,7 @@ func render(keyChangesChan chan *tcell.EventKey, errorChan chan error, config *c
 
 func renderForDefaultMode(screen tcell.Screen, config *conf.Config) {
 	drawFileList(screen, config)
-	
+
 	if waitingForAnotherKeyPress {
 		keybindings, ok := ChainableKeybindings[previousKeyPressed]
 		if ok {
@@ -1135,13 +1146,13 @@ func renderForDefaultMode(screen tcell.Screen, config *conf.Config) {
 		} else {
 			drawShortInfoLine(screen)
 		}
-		
-		return 
+
+		return
 	} else if shouldDisplayHelpSection {
 		drawHelpSection(screen)
 		return
 	}
-	
+
 	drawShortInfoLine(screen)
 }
 
@@ -1169,14 +1180,14 @@ func getEntryIndexFromPath(path, entryToLookFor string, config *conf.Config) (in
 
 	index := 0
 	for _, entry := range pathEntries {
-		if !config.ShowHiddenFiles && strings.HasPrefix(entry.Name(), "."){
+		if !config.ShowHiddenFiles && strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
-		
+
 		if entry.Name() == entryToLookFor {
 			return index, true
 		}
-		
+
 		index++
 	}
 
