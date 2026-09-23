@@ -405,10 +405,11 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	switch currMode {
 	case ModeSearch:
 		drawText(screen, dimensions, StyleActivePathIndicator, text)
-		screen.ShowCursor(dimensions.x2+1, dimensions.y1)
+		screen.ShowCursor(dimensions.x1 + len(text), dimensions.y1)
 		screen.SetCursorStyle(tcell.CursorStyleBlinkingBlock)
 	default:
 		drawText(screen, dimensions, StylePathIndicator, text)
+		screen.HideCursor()
 	}
 
 	parentSelectedIdx := 0
