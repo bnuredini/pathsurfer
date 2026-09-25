@@ -1,12 +1,10 @@
 # pathsurfer
 
 > [!WARNING]
-> This is <b>pre-alpha software</b>: expect active development and behavior change at any time.
+> This is <b>pre-alpha software</b>: expect behavior change at any time before a stable release.
 
-A tiny terminal utility for fast directory navigating.
-
-Built to work out of the box with sensible defaults, support for fuzzy finding, Vi-like
-keybindings, and shell integration.
+A tiny terminal utility for fast directory navigating. Built to work out of the box with sensible
+defaults, support for fuzzy finding, Vi-like keybindings, and shell integration.
 
 <img src="https://github.com/bnuredini/pathsurfer/blob/master/docs/imgs/screenshot1.png" alt="pathsurfer screenshot">
 
@@ -142,11 +140,12 @@ which shell integration you installed.
 
 ## Contributions
 
-Pull requests aren't reviewed due to time constraints, but feel free to open issues though.
+The source code is open, but pull requests aren't accepted/reviewed right now due to maintenance
+overhead. But bug reports are welcome so feel free to open an issue.
 
 ## License
 
-The source code is released under the MIT license.
+Pathsurfer is released under [the MIT license](./LICENSE).
 
 ---
 
