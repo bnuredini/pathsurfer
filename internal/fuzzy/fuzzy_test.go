@@ -33,6 +33,22 @@ func TestGeneral(t *testing.T) {
 				},
 			},
 		},
+		{
+			"ns",
+			[]string{"ns", "clones"},
+			[]Match{
+				Match{
+					CandidateString: "ns",
+					Indexes: []int{0, 1},
+					Score: 7,
+				},
+				Match{
+					CandidateString: "clones",
+					Indexes: []int{3, 5},
+					Score: 1,
+				},
+			},
+		},
 	}
 
 	for _, tt := range data {

@@ -2,6 +2,10 @@
 
 * Bugs
     - Term `ns` matches `clones` ahead of `ns`
+    - The right pane is copped off on a smaller window size even when there's enough space to
+      display the text
+    - Search query "xse" matched "VFXManager.asset" ahead of "XRSettings.asset"
+    - Hint sections still shows up after using keybinding `cn`
 * Improvements
     - When in search mode, ignore subsequent presses of the "/" key
 * Features
