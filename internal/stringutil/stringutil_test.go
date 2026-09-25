@@ -3,60 +3,59 @@ package stringutil
 import "testing"
 
 func TestDeletePreviousWord(t *testing.T) {
-	tests := []struct{
+	data := []struct{
 		Input string
-		Expected string
+		Want string
 	}{
 		{
 			Input: "",
-			Expected: "",
+			Want: "",
 		},
 		{
 			Input: "  ",
-			Expected: "",
+			Want: "",
 		},
 		{
 			Input: "test",
-			Expected: "",
+			Want: "",
 		},
 		{
 			Input: "test test",
-			Expected: "test ",
+			Want: "test ",
 		},
 		{
 			Input: "test test test",
-			Expected: "test test ",
+			Want: "test test ",
 		},
 		{
 			Input: "test  test",
-			Expected: "test  ",
+			Want: "test  ",
 		},
 		{
 			Input: " test",
-			Expected: " ",
+			Want: " ",
 		},
 		{
 			Input: "  test",
-			Expected: "  ",
+			Want: "  ",
 		},
 		{
 			Input: "  test  test",
-			Expected: "  test  ",
+			Want: "  test  ",
 		},
 		{
 			Input: "test  test   test",
-			Expected: "test  test   ",
+			Want: "test  test   ",
 		},
 		{
 			Input: "test  test   test   ",
-			Expected: "test  test   ",
+			Want: "test  test   ",
 		},
 	}
 
-	for _, tt := range tests {
-		got := DeletePreviousWord(tt.Input)
-		if got != tt.Expected {
-			t.Errorf("DeletePreviousWord(%q) = %q, want %q", tt.Input, got, tt.Expected)
+	for _, tt := range data {
+		if  got, want := DeletePreviousWord(tt.Input), tt.Want; got != want {
+			t.Errorf("DeletePreviousWord(%q) = %q, want %q", tt.Input, got, want)
 		}
 	}
 }
