@@ -312,36 +312,19 @@ func getFilteredDirEntires(path string, config *conf.Config) []fs.DirEntry {
 	return result
 }
 
-// CLEANUP: This function updates too many state variables. Ideally, it should
-// only touch the file listings.
-func handleFileListingChange(rawFiles []fs.DirEntry, config *conf.Config) {
-	updateFileListing(rawFiles, config)
-
-	if len(files) == 0 {
-		selectedIdx = 0
-	} else if selectedIdx >= len(files) {
-		selectedIdx = len(files) - 1
-	}
-
-	scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
-}
-
 func updateFileListing(rawFiles []fs.DirEntry, config *conf.Config) {
 	if config.ShowHiddenFiles {
 		files = rawFiles
-	} else {
-		files = []fs.DirEntry{}
+		return
+	} 
+	
+	files = []fs.DirEntry{}
 
-		for _, f := range rawFiles {
-			if !strings.HasPrefix(f.Name(), ".") {
-				files = append(files, f)
-			}
+	for _, f := range rawFiles {
+		if !strings.HasPrefix(f.Name(), ".") {
+			files = append(files, f)
 		}
 	}
-
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].Name() < files[j].Name()
-	})
 }
 
 func updateFileListingWithSearch(pattern string, files []fs.DirEntry, config *conf.Config, ) {
@@ -365,6 +348,24 @@ func handleDirectoryChange(path string, config *conf.Config) {
 	}
 
 	handleFileListingChange(dir, config)
+}
+
+// CLEANUP: This function updates too many state variables. Ideally, it should
+// only touch the file listings.
+func handleFileListingChange(rawFiles []fs.DirEntry, config *conf.Config) {
+	sort.Slice(rawFiles, func(i, j int) bool {
+		return rawFiles[i].Name() < rawFiles[j].Name()
+	})
+	
+	updateFileListing(rawFiles, config)
+
+	if len(files) == 0 {
+		selectedIdx = 0
+	} else if selectedIdx >= len(files) {
+		selectedIdx = len(files) - 1
+	}
+
+	scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
 }
 
 func drawFileList(screen tcell.Screen, config *conf.Config) {
