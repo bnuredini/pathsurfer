@@ -121,6 +121,7 @@ var ChainableKeybindings = map[string][]keybinding{
 	"c": []keybinding{
 		keybinding{key: "c", description: "Copy file path"},
 		keybinding{key: "n", description: "Copy file name"},
+		keybinding{key: "d", description: "Copy current directory path"},
 	},
 }
 
@@ -708,6 +709,11 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 	case 'n':
 		if previousKeyPressed == "c" && selectedIdx < len(files) {
 			writeToClipboard(files[selectedIdx].Name())
+		}
+		
+	case 'd':
+		if previousKeyPressed == "c" && selectedIdx < len(files) {
+			writeToClipboard(filepath.Dir(currPath))
 		}
 
 	case '?':
