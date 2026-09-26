@@ -711,10 +711,14 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 			writeToClipboard(files[selectedIdx].Name())
 		}
 		
+		waitingForAnotherKeyPress = false
+		
 	case 'd':
 		if previousKeyPressed == "c" && selectedIdx < len(files) {
 			writeToClipboard(filepath.Dir(currPath))
 		}
+		
+		waitingForAnotherKeyPress = false
 
 	case '?':
 		shouldDisplayHelpSection = true
