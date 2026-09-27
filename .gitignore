@@ -1,5 +1,7 @@
 tmp/
+temp/
 bin/
 build/
 *.log
 __debug_bin*
+todo.md
