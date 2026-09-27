@@ -390,7 +390,7 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	rightPaneDimensions := v4{
 		x1: mainPaneDimensions.x2 + 2,
 		y1: 2,
-		x2: mainPaneDimensions.x2 + secondaryPaneWidth,
+		x2: mainPaneDimensions.x2 + (2 * secondaryPaneWidth),
 		y2: h - 1,
 	}
 
