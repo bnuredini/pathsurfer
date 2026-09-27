@@ -862,12 +862,7 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 			}
 		}
 
-		if currSearchEntry == "" {
-			searchBarPrefix = SearchBarPrefixNavigating
-		} else {
-			searchBarPrefix = SearchBarPrefixSearching
-		}
-
+		searchBarPrefix = SearchBarPrefixSearching
 		currSearchEntry = ""
 
 	case tcell.KeyBacktab:
