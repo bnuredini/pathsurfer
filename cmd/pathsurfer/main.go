@@ -770,7 +770,10 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
 	switch ev.Key() {
 	case tcell.KeyRune:
-
+		if ev.Rune() == '/' {
+			return keyHandlingResult{}, nil
+		}
+	
 		// When in search mode, make sure the marker is at the top of the list.
 		// Since the marker should be at the top, the pane should be drawn as if
 		// both the selected index and the scroll offset are 0.
@@ -870,7 +873,7 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 	case tcell.KeyBacktab:
 		handleKeyPressLeft(config)
 	}
-
+	
 	return keyHandlingResult{shouldQuit: false, newPath: ""}, nil
 }
 
