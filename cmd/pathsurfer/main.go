@@ -232,7 +232,7 @@ func main() {
 	}
 	handleDirectoryChange(currPath, config)
 	drawFileList(screen, config)
-	drawShortInfoLine(screen)
+	drawShortHelpLine(screen)
 
 	keyEnteredChan := make(chan *tcell.EventKey)
 	errorChan := make(chan error)
@@ -246,7 +246,7 @@ func main() {
 		case *tcell.EventResize:
 			screen.Sync()
 			drawFileList(screen, config)
-			drawShortInfoLine(screen)
+			drawShortHelpLine(screen)
 			screen.Show()
 
 		case *tcell.EventKey:
@@ -538,13 +538,14 @@ func drawText(screen tcell.Screen, dimensions v4, style tcell.Style, text string
 	}
 }
 
-func drawShortInfoLine(screen tcell.Screen) {
-	drawStatusLine(screen, HelpMessageShort, StyleInfo)
+func drawShortHelpLine(screen tcell.Screen) {
+	_, h := screen.Size()
+	drawFullLine(screen, h-1, HelpMessageShort, StyleInfo)
 }
 
 func drawStatusLine(screen tcell.Screen, text string, style tcell.Style) {
 	_, h := screen.Size()
-	drawFullLine(screen, h, text, style)
+	drawFullLine(screen, h-1, text, style)
 }
 
 func drawFullLine(screen tcell.Screen, y int, text string, style tcell.Style) {
@@ -1126,7 +1127,7 @@ func render(keyChangesChan chan *tcell.EventKey, errorChan chan error, config *c
 
 			case ModeSearch:
 				drawFileList(screen, config)
-				drawShortInfoLine(screen)
+				drawShortHelpLine(screen)
 
 			case ModeRecordingMark:
 				drawFileList(screen, config)
@@ -1154,7 +1155,7 @@ func renderForDefaultMode(screen tcell.Screen, config *conf.Config) {
 		if ok {
 			drawHintSection(screen, config, keybindings)
 		} else {
-			drawShortInfoLine(screen)
+			drawShortHelpLine(screen)
 		}
 
 		return
@@ -1163,7 +1164,7 @@ func renderForDefaultMode(screen tcell.Screen, config *conf.Config) {
 		return
 	}
 
-	drawShortInfoLine(screen)
+	drawShortHelpLine(screen)
 }
 
 func canKeyPressesBeChained(key1, key2 string) bool {
