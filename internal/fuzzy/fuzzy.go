@@ -15,7 +15,7 @@ type Match struct {
 const (
 	FirstCharBonus   = 5
 	SeparatorBonus   = 10
-	CamelCaseBonus   = 8
+	CamelCaseBonus   = 6
 	ConsecutiveBonus = 5
 )
 
