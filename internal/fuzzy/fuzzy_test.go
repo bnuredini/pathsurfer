@@ -49,6 +49,22 @@ func TestGeneral(t *testing.T) {
 				},
 			},
 		},
+		{
+			"packages",
+			[]string{"PackageManagerSettings.asset", "Packages"},
+			[]Match{
+				Match{
+					CandidateString: "Packages",
+					Indexes: []int{0, 1, 2, 3, 4, 5, 6, 7},
+					Score: 13,
+				},
+				Match{
+					CandidateString: "PackageManagerSettings.asset",
+					Indexes: []int{0, 1, 2, 3, 4, 5, 6, 14},
+					Score: 12,
+				},
+			},
+		},
 	}
 
 	for _, tt := range data {
