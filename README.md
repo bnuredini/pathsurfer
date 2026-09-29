@@ -1,7 +1,7 @@
 # pathsurfer
 
 > [!WARNING]
-> This is <b>pre-alpha software</b>: expect behavior change at any time before a stable release.
+> This is <b>pre-alpha software</b>: expect behavior changes until a stable release.
 
 A tiny terminal utility for fast directory navigating. Built to work out of the box with sensible
 defaults, support for fuzzy finding, Vi-like keybindings, and shell integration.
@@ -22,7 +22,7 @@ defaults, support for fuzzy finding, Vi-like keybindings, and shell integration.
 ## Quickstart
 
 ```bash
-curl -fsSL https://github.com/bnuredini/pathsurfer/releases/latest/download/install.sh  | sh
+curl -fsSL https://github.com/bnuredini/pathsurfer/releases/latest/download/install.sh | sh
 ```
 
 ## Installing
@@ -31,21 +31,21 @@ Linux:
 
 ```bash
 curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-linux-amd64.tar.gz | tar xz
-./pathsurfer-linux-amd64.tar.gz wizard
+./pathsurfer wizard
 ```
 
 macOS:
 
 ```bash
 curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-darwin-arm64.tar.gz | tar xz
-./pathsurfer-darwin-arm64.tar.gz wizard
+./pathsurfer wizard
 ```
 
 Windows:
 
 ```bash
-curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-windows-amd64-.tar.gz | tar xz
-./pathsurfer-windows-amd64.tar.gz wizard
+curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-windows-amd64.tar.gz | tar xz
+./pathsurfer wizard
 ```
 -->
 
@@ -83,7 +83,7 @@ curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsu
 Building and integrating pathsurfer is easy: using Make, you'll just need to run one command to
 build the binary and one command to integrate with your shell.
 
-### Option #1: Building locally with `make`
+### Option #1: Using `make`
 
 To build and install, run:
 
@@ -103,9 +103,9 @@ Depending on which shell you use, run one of the following to integrate pathsurf
 
 Shell integration is what allows you to change directories when quitting the program.
 
-### Option #2: Building locally with `go`
+### Option #2: Using `go`
 
-If you don't have `make` in your system, you can build by using the Go toolchain directly:
+If you don't have `make` in your system, you can build Pathsurfer using the Go toolchain directly:
 
 ```bash
 go build ./cmd/pathsurfer
