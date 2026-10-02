@@ -65,6 +65,26 @@ func TestGeneral(t *testing.T) {
 				},
 			},
 		},
+		
+		// Should we deprioritize separators?
+		/*
+		{
+			"abc",
+			[]string{"abc", "another-birthday-cake"},
+			[]Match{
+				Match{
+					CandidateString: "abc",
+					Indexes: []int{0, 1, 2},
+					Score: 13,
+				},
+				Match{
+					CandidateString: "PackageManagerSettings.asset",
+					Indexes: []int{0, 8, 17},
+					Score: 12,
+				},
+			},
+		},
+		*/
 	}
 
 	for _, tt := range data {
