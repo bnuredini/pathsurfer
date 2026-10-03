@@ -317,8 +317,8 @@ func updateFileListing(rawFiles []fs.DirEntry, config *conf.Config) {
 	if config.ShowHiddenFiles {
 		files = rawFiles
 		return
-	} 
-	
+	}
+
 	files = []fs.DirEntry{}
 
 	for _, f := range rawFiles {
@@ -328,7 +328,7 @@ func updateFileListing(rawFiles []fs.DirEntry, config *conf.Config) {
 	}
 }
 
-func updateFileListingWithSearch(pattern string, files []fs.DirEntry, config *conf.Config, ) {
+func updateFileListingWithSearch(pattern string, files []fs.DirEntry, config *conf.Config) {
 	matches, _ := searchInDir(currSearchEntry, files)
 	updateFileListing(matches, config)
 }
@@ -357,7 +357,7 @@ func handleFileListingChange(rawFiles []fs.DirEntry, config *conf.Config) {
 	sort.Slice(rawFiles, func(i, j int) bool {
 		return rawFiles[i].Name() < rawFiles[j].Name()
 	})
-	
+
 	updateFileListing(rawFiles, config)
 
 	if len(files) == 0 {
@@ -407,7 +407,7 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	switch currMode {
 	case ModeSearch:
 		drawText(screen, dimensions, StyleActivePathIndicator, text)
-		screen.ShowCursor(dimensions.x1 + len(text), dimensions.y1)
+		screen.ShowCursor(dimensions.x1+len(text), dimensions.y1)
 		screen.SetCursorStyle(tcell.CursorStyleBlinkingBlock)
 	default:
 		drawText(screen, dimensions, StylePathIndicator, text)
@@ -488,14 +488,14 @@ func drawMarkHintSection(screen tcell.Screen, config *conf.Config) {
 		)
 	}
 
-	drawFullLine(screen, (h-2) - len(marks), "Bookmarks", StyleInfo)
-	drawFullLine(screen, (h-1) - len(marks), "", StyleInfo)
+	drawFullLine(screen, (h-2)-len(marks), "Bookmarks", StyleInfo)
+	drawFullLine(screen, (h-1)-len(marks), "", StyleInfo)
 
 	index := len(marks) - 1
 	for entry, value := range marks {
 		drawFullLine(
 			screen,
-			(h-1) - index,
+			(h-1)-index,
 			fmt.Sprintf("%c\t%s", entry, value),
 			StyleInfo,
 		)
@@ -711,14 +711,14 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 		if previousKeyPressed == "c" && selectedIdx < len(files) {
 			writeToClipboard(files[selectedIdx].Name())
 		}
-		
+
 		waitingForAnotherKeyPress = false
-		
+
 	case 'd':
 		if previousKeyPressed == "c" && selectedIdx < len(files) {
 			writeToClipboard(filepath.Dir(currPath))
 		}
-		
+
 		waitingForAnotherKeyPress = false
 
 	case '?':
@@ -774,7 +774,7 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 		if ev.Rune() == '/' {
 			return keyHandlingResult{}, nil
 		}
-	
+
 		// When in search mode, make sure the marker is at the top of the list.
 		// Since the marker should be at the top, the pane should be drawn as if
 		// both the selected index and the scroll offset are 0.
@@ -869,7 +869,7 @@ func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlin
 	case tcell.KeyBacktab:
 		handleKeyPressLeft(config)
 	}
-	
+
 	return keyHandlingResult{shouldQuit: false, newPath: ""}, nil
 }
 

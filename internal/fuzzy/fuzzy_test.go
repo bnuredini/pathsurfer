@@ -39,13 +39,13 @@ func TestGeneral(t *testing.T) {
 			[]Match{
 				Match{
 					CandidateString: "ns",
-					Indexes: []int{0, 1},
-					Score: 7,
+					Indexes:         []int{0, 1},
+					Score:           7,
 				},
 				Match{
 					CandidateString: "clones",
-					Indexes: []int{3, 5},
-					Score: 1,
+					Indexes:         []int{3, 5},
+					Score:           1,
 				},
 			},
 		},
@@ -55,35 +55,35 @@ func TestGeneral(t *testing.T) {
 			[]Match{
 				Match{
 					CandidateString: "Packages",
-					Indexes: []int{0, 1, 2, 3, 4, 5, 6, 7},
-					Score: 13,
+					Indexes:         []int{0, 1, 2, 3, 4, 5, 6, 7},
+					Score:           13,
 				},
 				Match{
 					CandidateString: "PackageManagerSettings.asset",
-					Indexes: []int{0, 1, 2, 3, 4, 5, 6, 14},
-					Score: 12,
+					Indexes:         []int{0, 1, 2, 3, 4, 5, 6, 14},
+					Score:           12,
 				},
 			},
 		},
-		
+
 		// Should we deprioritize separators?
 		/*
-		{
-			"abc",
-			[]string{"abc", "another-birthday-cake"},
-			[]Match{
-				Match{
-					CandidateString: "abc",
-					Indexes: []int{0, 1, 2},
-					Score: 13,
-				},
-				Match{
-					CandidateString: "PackageManagerSettings.asset",
-					Indexes: []int{0, 8, 17},
-					Score: 12,
+			{
+				"abc",
+				[]string{"abc", "another-birthday-cake"},
+				[]Match{
+					Match{
+						CandidateString: "abc",
+						Indexes: []int{0, 1, 2},
+						Score: 13,
+					},
+					Match{
+						CandidateString: "PackageManagerSettings.asset",
+						Indexes: []int{0, 8, 17},
+						Score: 12,
+					},
 				},
 			},
-		},
 		*/
 	}
 
