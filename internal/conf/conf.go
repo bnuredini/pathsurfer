@@ -44,8 +44,7 @@ func init() {
 	)
 	DefaultMarkFilePath = filepath.Join(
 		home,
-		".local",
-		"share",
+		".config",
 		ProgramName,
 		fmt.Sprintf("%s.mark", ProgramName),
 	)
@@ -115,6 +114,18 @@ func Init() (*Config, error) {
 		os.Exit(0)
 	}
 
+	markDir := filepath.Dir(result.MarkFilePath)
+	markDirInfo, err := os.Stat(markDir)
+	if os.IsNotExist(err) {
+		if err = os.Mkdir(markDir, 0755); err != nil {
+			log.Printf("Failed to create %q for storing marks", markDir)
+		}
+	} else if err != nil {
+		log.Fatalf("Failed to use %q for storing marks: %v", markDir, err)
+	} else if !markDirInfo.IsDir() {
+		log.Fatalf("Cannot store marks in %q because %q is not a directory", result.MarkFilePath, markDir)
+	}
+	
 	return result, nil
 }
 
