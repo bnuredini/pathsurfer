@@ -488,16 +488,16 @@ func drawMarkHintSection(screen tcell.Screen, config *conf.Config) {
 		)
 	}
 
-	drawText(screen, v4{0, (h - 1) - len(marks), w, (h - 1) - len(marks)}, StyleInfo, "Bookmarks")
+	drawFullLine(screen, (h-2) - len(marks), "Bookmarks", StyleInfo)
+	drawFullLine(screen, (h-1) - len(marks), "", StyleInfo)
 
 	index := len(marks) - 1
 	for entry, value := range marks {
-		dimensions := v4{0, (h - 1) - index, w, (h - 1) - index}
-		drawText(
+		drawFullLine(
 			screen,
-			dimensions,
-			StyleInfo,
+			(h-1) - index,
 			fmt.Sprintf("%c\t%s", entry, value),
+			StyleInfo,
 		)
 
 		index--

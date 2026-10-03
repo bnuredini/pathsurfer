@@ -2,7 +2,6 @@ package main
 
 const HelpMessage = `
 Help
-----
 
 j/k -> up/down
 l -> enter 
