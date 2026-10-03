@@ -1141,6 +1141,7 @@ func render(keyChangesChan chan *tcell.EventKey, errorChan chan error, config *c
 			screen.Show()
 
 		case err := <-errorChan:
+			renderForDefaultMode(screen, config)
 			drawStatusLine(screen, err.Error(), StyleError)
 			screen.Show()
 		}
