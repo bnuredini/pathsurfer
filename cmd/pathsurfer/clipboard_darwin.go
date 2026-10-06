@@ -1,6 +1,6 @@
-package main
+//go:build darwin
 
-// +build darwin
+package main
 
 import (
 	"os/exec"
@@ -8,16 +8,16 @@ import (
 
 func writeToClipboard(s string) error {
 	cmd := exec.Command("pbcopy")
-	
+
 	input, err := cmd.StdinPipe()
 	if err != nil {
 		return err
 	}
-	
+
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	
+
 	if _, err = input.Write([]byte(s)); err != nil {
 		return err
 	}
@@ -25,6 +25,6 @@ func writeToClipboard(s string) error {
 	if err = input.Close(); err != nil {
 		return err
 	}
-	
+
 	return cmd.Wait()
 }
