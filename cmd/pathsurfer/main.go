@@ -916,7 +916,7 @@ func handleKeyPressInListeningForMark(ev *tcell.EventKey, config *conf.Config) (
 
 	f, err := os.Open(path)
 	if err != nil {
-		return result, errors.New(fmt.Sprintf("%q is not a valid file", f.Name()))
+		return result, errors.New(fmt.Sprintf("%q is not a valid file", path))
 	}
 	defer f.Close()
 
