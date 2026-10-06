@@ -8,14 +8,14 @@ func DeletePreviousWord(s string) string {
 	}
 
 	endIndex := -1
-	
-	for i := len(s)-2; i >= 0; i-- {
+
+	for i := len(s) - 2; i >= 0; i-- {
 		if s[i] == ' ' && s[i+1] != ' ' {
-			endIndex = i+1
+			endIndex = i + 1
 			break
-		} 
+		}
 	}
-	
+
 	if endIndex == -1 {
 		return ""
 	}

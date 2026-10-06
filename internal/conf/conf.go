@@ -125,7 +125,7 @@ func Init() (*Config, error) {
 	} else if !markDirInfo.IsDir() {
 		log.Fatalf("Cannot store marks in %q because %q is not a directory", result.MarkFilePath, markDir)
 	}
-	
+
 	return result, nil
 }
 
