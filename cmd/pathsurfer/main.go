@@ -693,7 +693,7 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 			break
 		}
 
-		if previousKeyPressed == "c" {
+		if previousKeyPressed == "c" && selectedIdx > 0 && selectedIdx < len(files) {
 			s := filepath.Join(currPath, files[selectedIdx].Name())
 			writeToClipboard(s)
 		}
@@ -701,6 +701,10 @@ func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandli
 		waitingForAnotherKeyPress = false
 
 	case 'G':
+		if len(files) == 0 {
+			break
+		}
+
 		selectedIdx = len(files) - 1
 
 		_, screenHeight := screen.Size()
@@ -1001,7 +1005,7 @@ func storeNewMark(r rune, path string, config *conf.Config) error {
 		l := scanner.Text()
 		parts := strings.Split(l, " ")
 		if len(parts) < 2 {
-			slog.Debug("Found invalid line in mark file: %v", l)
+			slog.Debug("Found invalid line in mark file", "line", l)
 			continue
 		}
 
