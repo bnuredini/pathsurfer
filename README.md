@@ -108,7 +108,7 @@ Shell integration is what allows you to change directories when quitting the pro
 If you don't have `make` in your system, you can build Pathsurfer using the Go toolchain directly:
 
 ```bash
-go build ./cmd/pathsurfer
+go build -o ./build/pathsurfer ./cmd/pathsurfer
 mkdir -p ~/.local/bin
 install -m 744 ./build/pathsurfer ~/.local/bin/pathsurfer
 ```
