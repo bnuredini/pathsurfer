@@ -1054,8 +1054,11 @@ func readMarks(config *conf.Config) (map[rune]string, error) {
 		}
 
 		r := runes[0]
-		path := parts[1]
-		result[r] = path
+		if len(parts) > 2 {
+			result[r] = strings.Join(parts[1:], " ")
+		} else {
+			result[r] = parts[1]
+		}
 
 		lineIdx++
 	}
