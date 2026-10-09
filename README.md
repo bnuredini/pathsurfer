@@ -18,37 +18,6 @@ defaults, support for fuzzy finding, Vi-like keybindings, and shell integration.
 * Configurable settings
 * Integration with bash, zsh, and fish for fast directory navigation
 
-<!--
-## Quickstart
-
-```bash
-curl -fsSL https://github.com/bnuredini/pathsurfer/releases/latest/download/install.sh | sh
-```
-
-## Installing
-
-Linux:
-
-```bash
-curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-linux-amd64.tar.gz | tar xz
-./pathsurfer wizard
-```
-
-macOS:
-
-```bash
-curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-darwin-arm64.tar.gz | tar xz
-./pathsurfer wizard
-```
-
-Windows:
-
-```bash
-curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-windows-amd64.tar.gz | tar xz
-./pathsurfer wizard
-```
--->
-
 ## Keybindings
 
 ### Default mode
