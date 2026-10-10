@@ -68,13 +68,13 @@ func Init() (*Config, error) {
 		&result.WriteDebugLogs,
 		"debug",
 		false,
-		"Determines whether debug logs are enabled (set to false by default)",
+		"Enables debug logs",
 	)
 	flag.BoolVar(
 		&result.ShowHiddenFiles,
 		"show-hidden-files",
 		false,
-		"Determines whether hidden files are shown (set to false by default)",
+		"Shows hidden files",
 	)
 	flag.StringVar(
 		&result.LogFilePath,
@@ -92,12 +92,12 @@ func Init() (*Config, error) {
 	displayVersion := flag.Bool(
 		"version",
 		false,
-		"Show version information",
+		"Shows version information",
 	)
 	displayHelp := flag.Bool(
 		"help",
 		false,
-		"Show help information",
+		"Shows help information",
 	)
 
 	flag.Parse()
