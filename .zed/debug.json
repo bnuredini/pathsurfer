@@ -1,0 +1,12 @@
+[
+  {
+    "adapter": "Delve",
+    "label": "Pathsurfer (Debug)",
+    "request": "launch",
+    "mode": "debug",
+    "program": "./cmd/pathsurfer",
+    "args": [],
+    "buildFlags": [],
+    "env": {}
+  }
+]
