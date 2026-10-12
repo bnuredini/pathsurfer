@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"errors"
-	"flag"
 	"fmt"
 	"io/fs"
 	"log"
@@ -43,16 +42,9 @@ const (
 	SearchBarPrefixNavigating = "navigating"
 )
 
-const BigJumpLength = 22
+var screen tcell.Screen
 
-// CLEANUP: Remove these global variables. Split them in separate struct types.
-// Introduce different modules for different responsibilities: UI, user input,
-// file management/parsing.
-//
-// Follow a simple: Model -> Render -> Update.
-var (
-	screen tcell.Screen
-
+type model struct {
 	currPath        string
 	currMode        Mode
 	currSearchEntry string
@@ -62,7 +54,6 @@ var (
 	// allowing the user to quickly go back to the original path after they've
 	// changed directories multiple times.
 	positionHistory map[string]int
-
 	// Used when the number of files is higher than what can fit on the screen.
 	// This value indicates how many lines/rows have been scrolled past by the
 	// user.
@@ -71,17 +62,16 @@ var (
 	parentScrollOffset int
 	selectedIdx        int
 	searchBarPrefix    SearchBarPrefix
-
 	// It makes sense to use this value only if waitingForAnotherKeyPress is
 	// true. The purpose of these to variables is to add support for Vi-like
 	// keybindings such as gg.
 	previousKeyPressed        string
 	waitingForAnotherKeyPress bool
-
-	marks map[rune]string
-
-	shouldDisplayHelpSection bool
-)
+	marks                     map[rune]string
+	shouldDisplayHelpSection  bool
+	globalErr                 error
+	shouldQuit                bool
+}
 
 var (
 	StylePathIndicator       = tcell.StyleDefault.Foreground(tcell.ColorGray)
@@ -129,21 +119,6 @@ func main() {
 	config, err := conf.Init()
 	if err != nil {
 		log.Fatalf("Failed to boot up: %v", err)
-	}
-
-	if len(flag.Args()) > 0 {
-		pathArg := strings.TrimSpace(flag.Args()[0])
-
-		pathDirInfo, err := os.Stat(pathArg)
-		if os.IsNotExist(err) {
-			log.Fatalf("%q does not exist", pathArg)
-		} else if err != nil {
-			log.Fatalf("%q is not a valid path: %v", pathArg, err)
-		} else if !pathDirInfo.IsDir() {
-			log.Fatalf("%q is not a valid directory", pathArg)
-		}
-
-		currPath = pathArg
 	}
 
 	logDir := filepath.Dir(config.LogFilePath)
@@ -213,30 +188,11 @@ func main() {
 
 	screen.SetStyle(StyleReset)
 	screen.Clear()
+	defer screen.Fini()
 
 	pathToPrint := ""
-	positionHistory = make(map[string]int)
-	searchBarPrefix = SearchBarPrefixNavigating
-
-	if strings.TrimSpace(currPath) == "" {
-		currPath, err = os.Getwd()
-		if err != nil {
-			slog.Info("Couldn't get current directory", "err", err)
-			os.Exit(1)
-		}
-	}
-
-	marks, err = readMarks(config)
-	if err != nil {
-		marks = map[rune]string{}
-	}
-	handleDirectoryChange(currPath, config)
-	drawFileList(screen, config)
-	drawShortHelpLine(screen)
-
-	keyEnteredChan := make(chan *tcell.EventKey)
-	errorChan := make(chan error)
-	go render(keyEnteredChan, errorChan, config)
+	m := initModel(config)
+	render(m, config)
 
 	running := true
 	for running {
@@ -245,31 +201,30 @@ func main() {
 		switch ev := ev.(type) {
 		case *tcell.EventResize:
 			screen.Sync()
-			drawFileList(screen, config)
+			drawFileList(m, screen, config)
 			drawShortHelpLine(screen)
 			screen.Show()
 
+			render(m, config)
+
 		case *tcell.EventKey:
-			result, err := handleKeyPress(ev, config)
-			if result.shouldQuit {
-				pathToPrint = result.newPath
+			slog.Debug("main loop", "keyRune", ev.Rune(), "keyString", string(ev.Rune()), "currMode", m.currMode, "positionHistory", m.positionHistory)
+
+			var err error
+			m, err = handleKeyPress(m, ev, config)
+			if err != nil {
+				m.globalErr = err
+			}
+
+			if m.shouldQuit {
+				pathToPrint = m.currPath
 				running = false
 				break
 			}
 
-			if result.addingNewMark {
-				marks, err = readMarks(config)
-			}
-
-			if err != nil {
-				errorChan <- err
-			} else {
-				keyEnteredChan <- ev
-			}
+			render(m, config)
 		}
 	}
-
-	screen.Fini()
 
 	// Assuming that the user is using one of the wrapper scripts (psurf.sh or
 	// psurf.fish), this program will print the current directory when the user
@@ -280,96 +235,562 @@ func main() {
 	}
 }
 
-func getFilteredDirEntires(path string, config *conf.Config) []fs.DirEntry {
-	result := []fs.DirEntry{}
+func initModel(config *conf.Config) model {
+	m := model{}
 
-	if strings.TrimSpace(path) == "" {
-		return result
+	m.positionHistory = make(map[string]int)
+	m.searchBarPrefix = SearchBarPrefixNavigating
+
+	if strings.TrimSpace(conf.InitialPath) == "" {
+		var err error
+		m.currPath, err = os.Getwd()
+		if err != nil {
+			slog.Info("Couldn't get current directory", "err", err)
+			os.Exit(1)
+		}
 	}
 
-	rawFiles, err := os.ReadDir(path)
+	var err error
+	m.marks, err = readMarks(config)
 	if err != nil {
-		// TODO: Return an error value here and display it on the screen.
-		slog.Debug("Failed to read directory", "path", path, "err", err)
-		return result
+		m.globalErr = err
+		slog.Info("Error whilst reading marks", "err", err)
+		m.marks = map[rune]string{}
 	}
+	m = handleDirectoryChange(m, m.currPath, config)
 
-	if config.ShowHiddenFiles {
-		result = rawFiles
-	} else {
-		result = []fs.DirEntry{}
-
-		for _, f := range rawFiles {
-			if !strings.HasPrefix(f.Name(), ".") {
-				result = append(result, f)
-			}
-		}
-	}
-
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name() < result[j].Name()
-	})
-
-	return result
+	return m
 }
 
-func updateFileListing(rawFiles []fs.DirEntry, config *conf.Config) {
-	if config.ShowHiddenFiles {
-		files = rawFiles
-		return
-	}
-
-	files = []fs.DirEntry{}
-
-	for _, f := range rawFiles {
-		if !strings.HasPrefix(f.Name(), ".") {
-			files = append(files, f)
-		}
-	}
-}
-
-func updateFileListingWithSearch(pattern string, files []fs.DirEntry, config *conf.Config) {
-	matches, _ := searchInDir(currSearchEntry, files)
-	updateFileListing(matches, config)
-}
-
-func handleDirectoryChange(path string, config *conf.Config) {
+// TODO: Reduce parameter count.
+func handleDirectoryChange(m model, path string, config *conf.Config) model {
 	dir, err := os.ReadDir(path)
 	if err != nil {
 		if os.IsPermission(err) {
 			slog.Error("Encountered a permissions issue when updating the file listing", "err", err)
 		}
 
-		slog.Error("Couldn't read directory", "currPath", currPath, "err", err)
-		files = []fs.DirEntry{}
-		selectedIdx = 0
-		scrollOffset = 0
+		slog.Error("Couldn't read directory", "currPath", m.currPath, "err", err)
+		m.files = []fs.DirEntry{}
+		m.selectedIdx = 0
+		m.scrollOffset = 0
 
-		return // TODO: Return an error here.
+		return m // TODO: Return an error here.
 	}
 
-	handleFileListingChange(dir, config)
+	m = handleFileListingChange(m, dir, config)
+
+	return m
 }
 
 // CLEANUP: This function updates too many state variables. Ideally, it should
 // only touch the file listings.
-func handleFileListingChange(rawFiles []fs.DirEntry, config *conf.Config) {
+func handleFileListingChange(m model, rawFiles []fs.DirEntry, config *conf.Config) model {
 	sort.Slice(rawFiles, func(i, j int) bool {
 		return rawFiles[i].Name() < rawFiles[j].Name()
 	})
 
-	updateFileListing(rawFiles, config)
+	m = updateFileListing(m, rawFiles, config)
 
-	if len(files) == 0 {
-		selectedIdx = 0
-	} else if selectedIdx >= len(files) {
-		selectedIdx = len(files) - 1
+	if len(m.files) == 0 {
+		m.selectedIdx = 0
+	} else if m.selectedIdx >= len(m.files) {
+		m.selectedIdx = len(m.files) - 1
 	}
 
-	scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
+	m.scrollOffset = calculateScrollOffset(m, screen, m.selectedIdx)
+
+	return m
 }
 
-func drawFileList(screen tcell.Screen, config *conf.Config) {
+func updateFileListing(m model, rawFiles []fs.DirEntry, config *conf.Config) model {
+	if config.ShowHiddenFiles {
+		m.files = rawFiles
+		return m
+	}
+
+	m.files = []fs.DirEntry{}
+
+	for _, f := range rawFiles {
+		if !strings.HasPrefix(f.Name(), ".") {
+			m.files = append(m.files, f)
+		}
+	}
+
+	return m
+}
+
+func updateFileListingWithSearch(m model, files []fs.DirEntry, config *conf.Config) model {
+	matches, _ := searchInDir(m.currSearchEntry, files)
+	return updateFileListing(m, matches, config)
+}
+
+func handleKeyPress(m model, ev *tcell.EventKey, config *conf.Config) (model, error) {
+	// Some terminals deliver Ctrl+C as \x03. Code point 3 is the ASCII ETX
+	// control character.
+	if ev.Key() == tcell.KeyCtrlC || ev.Rune() == 3 {
+		return m, nil
+	}
+
+	var err error
+	switch m.currMode {
+	case ModeDefault:
+		m, err = handleKeyPressInDefault(m, ev, config)
+	case ModeSearch:
+		m, err = handleKeyPressInSearch(m, ev, config)
+	case ModeRecordingMark:
+		m, err = handleKeyPressInRecordingMark(m, ev, config)
+	case ModeListeningForMark:
+		m, err = handleKeyPressInListeningForMark(m, ev, config)
+	}
+
+	return m, err
+}
+
+func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (model, error) {
+	if m.waitingForAnotherKeyPress && !canKeyPressesBeChained(m.previousKeyPressed, string(ev.Rune())) {
+		// CLEANUP: Find a better reset value. With this reset value and with
+		// the fact that we're using ev.Rune(), users can't use the spacebar for
+		// chainable keybindings.
+		m.previousKeyPressed = " "
+		m.waitingForAnotherKeyPress = false
+	}
+
+	if m.searchBarPrefix == SearchBarPrefixSearched {
+		m.searchBarPrefix = SearchBarPrefixNavigating
+	}
+
+	switch ev.Rune() {
+	case 'q':
+		m.shouldQuit = true
+		return m, nil
+
+	case 'j':
+		m = handleKeyPressDown(m)
+
+	case 'k':
+		m = handleKeyPressUp(m)
+
+	case 'h':
+		m = handleKeyPressLeft(m, config)
+
+	case 'l':
+		m = handleKeyPressRight(m, config)
+
+	case '.':
+		config.ShowHiddenFiles = !config.ShowHiddenFiles
+		m = handleDirectoryChange(m, m.currPath, config)
+
+	case '/':
+		m.currMode = ModeSearch
+		m.searchBarPrefix = SearchBarPrefixSearching
+
+	case 'm':
+		m.currMode = ModeRecordingMark
+
+	case '\'':
+		m.currMode = ModeListeningForMark
+
+	case 'g':
+		if !m.waitingForAnotherKeyPress {
+			m.waitingForAnotherKeyPress = true
+			m.previousKeyPressed = "g"
+			break
+		}
+
+		if m.previousKeyPressed == "g" {
+			m.selectedIdx = 0
+			m.scrollOffset = 0
+		}
+
+		m.waitingForAnotherKeyPress = false
+
+	case 'c':
+		if !m.waitingForAnotherKeyPress {
+			m.waitingForAnotherKeyPress = true
+			m.previousKeyPressed = "c"
+			break
+		}
+
+		if m.previousKeyPressed == "c" && m.selectedIdx > 0 && m.selectedIdx < len(m.files) {
+			s := filepath.Join(m.currPath, m.files[m.selectedIdx].Name())
+			writeToClipboard(s)
+		}
+
+		m.waitingForAnotherKeyPress = false
+
+	case 'G':
+		if len(m.files) == 0 {
+			break
+		}
+
+		m.selectedIdx = len(m.files) - 1
+
+		_, screenHeight := screen.Size()
+		heightUsableForFiles := max(screenHeight-3, 1)
+		m.scrollOffset = max((len(m.files)-1)-(heightUsableForFiles-1), 0)
+
+	case 'n':
+		if m.previousKeyPressed == "c" && m.selectedIdx < len(m.files) {
+			writeToClipboard(m.files[m.selectedIdx].Name())
+		}
+
+		m.waitingForAnotherKeyPress = false
+
+	case 'd':
+		if m.previousKeyPressed == "c" && m.selectedIdx < len(m.files) {
+			writeToClipboard(filepath.Dir(m.currPath))
+		}
+
+		m.waitingForAnotherKeyPress = false
+
+	case '?':
+		m.shouldDisplayHelpSection = true
+	}
+
+	switch ev.Key() {
+	case tcell.KeyUp:
+		m = handleKeyPressUp(m)
+
+	case tcell.KeyDown:
+		m = handleKeyPressDown(m)
+
+	case tcell.KeyLeft:
+		m = handleKeyPressLeft(m, config)
+
+	case tcell.KeyRight:
+		m = handleKeyPressRight(m, config)
+
+	case tcell.KeyCtrlD:
+		if m.selectedIdx >= len(m.files)-1 {
+			break
+		}
+
+		m.selectedIdx = min(m.selectedIdx+config.BigJumpLength, len(m.files)-1)
+		m.scrollOffset = calculateScrollOffset(m, screen, m.selectedIdx)
+
+	case tcell.KeyCtrlU:
+		if m.selectedIdx <= config.BigJumpLength {
+			m.selectedIdx = 0
+		} else {
+			m.selectedIdx = m.selectedIdx - config.BigJumpLength
+		}
+
+		m.scrollOffset = calculateScrollOffset(m, screen, m.selectedIdx)
+
+	case tcell.KeyESC:
+		if m.currSearchEntry != "" {
+			m.currSearchEntry = ""
+			m.searchBarPrefix = SearchBarPrefixNavigating
+			m = handleDirectoryChange(m, m.currPath, config)
+		}
+
+		m.shouldDisplayHelpSection = false
+	}
+
+	return m, nil
+}
+
+func handleKeyPressInSearch(m model, ev *tcell.EventKey, config *conf.Config) (model, error) {
+	switch ev.Key() {
+	case tcell.KeyRune:
+		if ev.Rune() == '/' {
+			return m, nil
+		}
+
+		// When in search mode, make sure the marker is at the top of the list.
+		// Since the marker should be at the top, the pane should be drawn as if
+		// both the selected index and the scroll offset are 0.
+		if strings.TrimSpace(m.currSearchEntry) == "" {
+			m.selectedIdx = 0
+			m.scrollOffset = 0
+		}
+
+		m.currSearchEntry = m.currSearchEntry + string(ev.Rune())
+		matches, err := searchInDir(m.currSearchEntry, m.files)
+		if err != nil {
+			return m, err
+		}
+
+		m = updateFileListing(m, matches, config)
+
+	case tcell.KeyBackspace, 127:
+		if len(m.currSearchEntry) == 0 {
+			break
+		}
+
+		currDirFiles, err := os.ReadDir(m.currPath)
+		if err != nil {
+			return m, err
+		}
+
+		if len(m.currSearchEntry) == 1 {
+			m.currSearchEntry = ""
+			m = handleFileListingChange(m, currDirFiles, config)
+		} else if ev.Modifiers()&tcell.ModAlt != 0 {
+			m.currSearchEntry = stringutil.DeletePreviousWord(m.currSearchEntry)
+			if m.currSearchEntry == "" {
+				m = handleFileListingChange(m, currDirFiles, config)
+			} else {
+				m = updateFileListingWithSearch(m, currDirFiles, config)
+			}
+		} else {
+			m.currSearchEntry = m.currSearchEntry[:len(m.currSearchEntry)-1]
+			m = updateFileListingWithSearch(m, currDirFiles, config)
+		}
+
+	case tcell.KeyCR:
+		m.currMode = ModeDefault
+
+		if strings.TrimSpace(m.currSearchEntry) == "" {
+			m = handleDirectoryChange(m, m.currPath, config)
+			break
+		}
+
+		// User is now done searching. Set the marker to point to the first entry.
+		m.selectedIdx = 0
+		m.scrollOffset = 0
+		m.searchBarPrefix = SearchBarPrefixSearched
+
+	case tcell.KeyESC:
+		// Disable search mode and ignore the current search string. This is
+		// consistent with how searching work in Vim.
+		m.currMode = ModeDefault
+		m.currSearchEntry = ""
+		m.searchBarPrefix = SearchBarPrefixNavigating
+		m = handleDirectoryChange(m, m.currPath, config)
+
+	case tcell.KeyTAB:
+		if len(m.files) == 0 {
+			break
+		}
+
+		firstMatch := m.files[0]
+		if firstMatch.IsDir() {
+			index, indexFound := getEntryIndexFromPath(m, m.currPath, firstMatch.Name(), config)
+			if !indexFound {
+				// TODO: Log error in screen.
+				break
+			}
+
+			m.positionHistory[m.currPath] = index
+			newPath := filepath.Join(m.currPath, firstMatch.Name())
+			m = handleDirectoryChange(m, newPath, config)
+			m.currPath = newPath
+
+			if indexFromHistory, ok := m.positionHistory[m.currPath]; ok {
+				m.selectedIdx = indexFromHistory
+			} else {
+				m.selectedIdx = 0
+			}
+		}
+
+		m.searchBarPrefix = SearchBarPrefixSearching
+		m.currSearchEntry = ""
+
+	case tcell.KeyBacktab:
+		m = handleKeyPressLeft(m, config)
+	}
+
+	return m, nil
+}
+
+func handleKeyPressInRecordingMark(m model, ev *tcell.EventKey, config *conf.Config) (model, error) {
+	m.currMode = ModeDefault
+
+	if ev.Key() == tcell.KeyESC {
+		return m, nil
+	}
+
+	if ev.Key() != tcell.KeyRune {
+		return m, errors.New("setting mark: value for mark must be a rune")
+	}
+
+	err := storeNewMark(ev.Rune(), m.currPath, config)
+	if err != nil {
+		return m, err
+	}
+
+	m.marks, err = readMarks(config)
+
+	return m, err
+}
+
+func handleKeyPressInListeningForMark(m model, ev *tcell.EventKey, config *conf.Config) (model, error) {
+	m.currMode = ModeDefault
+
+	if ev.Key() == tcell.KeyESC {
+		return m, nil
+	}
+
+	if ev.Key() != tcell.KeyRune {
+		return m, errors.New("listening for mark: value for mark must be a rune")
+	}
+
+	r := ev.Rune()
+	path, ok := m.marks[r]
+	if !ok {
+		return m, fmt.Errorf("listening for mark: %q is not set", r)
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return m, fmt.Errorf("%q is not a valid file", path)
+	}
+	defer f.Close()
+
+	m.currPath = path
+	m = handleDirectoryChange(m, m.currPath, config)
+	m.selectedIdx = 0
+	m.scrollOffset = 0
+	m.currSearchEntry = ""
+
+	return m, nil
+}
+
+func handleKeyPressDown(m model) model {
+	if len(m.files) == 0 {
+		return m
+	}
+
+	m.selectedIdx = (m.selectedIdx + 1) % len(m.files)
+	m.scrollOffset = calculateScrollOffset(m, screen, m.selectedIdx)
+
+	return m
+}
+
+func handleKeyPressUp(m model) model {
+	if len(m.files) == 0 {
+		return m
+	}
+
+	m.selectedIdx = (m.selectedIdx - 1 + len(m.files)) % len(m.files)
+	m.scrollOffset = calculateScrollOffset(m, screen, m.selectedIdx)
+
+	return m
+}
+
+func handleKeyPressLeft(m model, config *conf.Config) model {
+	m.positionHistory[m.currPath] = m.selectedIdx
+
+	oldPath := m.currPath
+	newPath := filepath.Dir(m.currPath)
+	m.currPath = newPath
+	m.currSearchEntry = ""
+
+	indexFromHistory, ok := m.positionHistory[newPath]
+	if !ok {
+		for i, f := range m.files {
+			if f.Name() == filepath.Base(oldPath) {
+				m.selectedIdx = i
+			}
+		}
+	} else {
+		m.selectedIdx = indexFromHistory
+	}
+
+	m = handleDirectoryChange(m, m.currPath, config)
+
+	return m
+}
+
+func handleKeyPressRight(m model, config *conf.Config) model {
+	m.currSearchEntry = ""
+
+	if m.selectedIdx < len(m.files) && m.files[m.selectedIdx].IsDir() {
+		m.parentScrollOffset = m.scrollOffset
+		m.positionHistory[m.currPath] = m.selectedIdx
+
+		m.currPath = filepath.Join(m.currPath, m.files[m.selectedIdx].Name())
+		m = handleDirectoryChange(m, m.currPath, config)
+
+		if indexFromHistory, ok := m.positionHistory[m.currPath]; ok {
+			m.selectedIdx = indexFromHistory
+		} else {
+			m.selectedIdx = 0
+		}
+	}
+
+	return m
+}
+
+// TODO: Reduce parameter count.
+func calculateScrollOffset(m model, screen tcell.Screen, selectedIdx int) int {
+	_, screenHeight := screen.Size()
+	heightUsableForFiles := max(screenHeight-3, 1)
+
+	return calculateScrollOffsetForHeight(selectedIdx, m.scrollOffset, heightUsableForFiles, len(m.files))
+}
+
+// BUG: Wrapping is buggy right now. Try wrapping in a directory with a lot of files.
+func calculateScrollOffsetForHeight(selectedIdx, currScrollOffset, heightUsableForFiles, listLen int) int {
+	result := 0
+
+	if selectedIdx < currScrollOffset {
+		// Gone over the top edge. The scroll marker should be where the current
+		// file marker is.
+		result = selectedIdx
+	} else if selectedIdx >= currScrollOffset+heightUsableForFiles {
+		// Gone over the bottom edge. Since the file marker is at the bottom,
+		// the scroll marker should be (heightUsableForFileList - 1) rows behind
+		// the file marker.
+		result = selectedIdx - (heightUsableForFiles - 1)
+	} else {
+		// Keep the scroll offset the same as long as the edges are not being touched.
+		result = currScrollOffset
+	}
+
+	maxOffset := max((listLen-1)-(heightUsableForFiles-1), 0)
+
+	return min(result, maxOffset)
+}
+
+func render(m model, config *conf.Config) {
+	switch m.currMode {
+	case ModeDefault:
+		renderForDefaultMode(m, screen, config)
+
+	case ModeSearch:
+		drawFileList(m, screen, config)
+		drawShortHelpLine(screen)
+
+	case ModeRecordingMark:
+		drawFileList(m, screen, config)
+		drawStatusLine(screen, "Listening for mark...", StyleAttention)
+
+	case ModeListeningForMark:
+		drawFileList(m, screen, config)
+		drawMarkHintSection(m, screen)
+	}
+
+	if m.globalErr != nil {
+		drawStatusLine(screen, m.globalErr.Error(), StyleError)
+	}
+
+	screen.Show()
+}
+
+func renderForDefaultMode(m model, screen tcell.Screen, config *conf.Config) {
+	drawFileList(m, screen, config)
+
+	if m.waitingForAnotherKeyPress {
+		keybindings, ok := ChainableKeybindings[m.previousKeyPressed]
+		if ok {
+			drawHintSection(screen, keybindings)
+		} else {
+			drawShortHelpLine(screen)
+		}
+
+		return
+	} else if m.shouldDisplayHelpSection {
+		drawHelpSection(screen)
+		return
+	}
+
+	drawShortHelpLine(screen)
+}
+
+func drawFileList(m model, screen tcell.Screen, config *conf.Config) {
 	screen.Clear()
 
 	w, h := screen.Size()
@@ -397,14 +818,14 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 	sep1X := leftPaneDimensions.x2 + 1
 	sep2X := mainPaneDimensions.x2 + 1
 
-	for i := range h {
-		screen.SetContent(sep1X, i, '|', nil, tcell.StyleDefault)
-		screen.SetContent(sep2X, i, '|', nil, tcell.StyleDefault)
+	for i := range h - 1 {
+		screen.SetContent(sep1X, i+1, '|', nil, tcell.StyleDefault)
+		screen.SetContent(sep2X, i+1, '|', nil, tcell.StyleDefault)
 	}
 
 	dimensions := v4{x1: mainPaneDimensions.x1, y1: 0, x2: w, y2: 0}
-	text := fmt.Sprintf("%s: %s/%s", searchBarPrefix, currPath, currSearchEntry)
-	switch currMode {
+	text := fmt.Sprintf(" %s: %s/%s", m.searchBarPrefix, m.currPath, m.currSearchEntry)
+	switch m.currMode {
 	case ModeSearch:
 		drawText(screen, dimensions, StyleActivePathIndicator, text)
 		screen.ShowCursor(dimensions.x1+len(text), dimensions.y1)
@@ -416,33 +837,33 @@ func drawFileList(screen tcell.Screen, config *conf.Config) {
 
 	parentSelectedIdx := 0
 	parentFiles := []fs.DirEntry{}
-	parentDir := filepath.Dir(currPath)
+	parentDir := filepath.Dir(m.currPath)
 
 	if strings.TrimSpace(parentDir) != "" || parentDir != "/" {
-		parentFiles = getFilteredDirEntires(filepath.Dir(currPath), config)
+		parentFiles = getDirEntries(filepath.Dir(m.currPath), config)
 
 		for i, f := range parentFiles {
-			if f.Name() == filepath.Base(currPath) {
+			if f.Name() == filepath.Base(m.currPath) {
 				parentSelectedIdx = i
 			}
 		}
 	}
 
-	parentScrollOffset = calculateScrollOffsetForHeight(
+	m.parentScrollOffset = calculateScrollOffsetForHeight(
 		parentSelectedIdx,
-		parentScrollOffset,
+		m.parentScrollOffset,
 		max(h-2, 1),
 		len(parentFiles),
 	)
 
 	childFiles := []fs.DirEntry{}
-	if selectedIdx < len(files) && files[selectedIdx].IsDir() {
-		childDir := filepath.Join(currPath, files[selectedIdx].Name())
-		childFiles = getFilteredDirEntires(childDir, config)
+	if m.selectedIdx < len(m.files) && m.files[m.selectedIdx].IsDir() {
+		childDir := filepath.Join(m.currPath, m.files[m.selectedIdx].Name())
+		childFiles = getDirEntries(childDir, config)
 	}
 
-	drawPane(screen, parentFiles, leftPaneDimensions, parentSelectedIdx, parentScrollOffset)
-	drawPane(screen, files, mainPaneDimensions, selectedIdx, scrollOffset)
+	drawPane(screen, parentFiles, leftPaneDimensions, parentSelectedIdx, m.parentScrollOffset)
+	drawPane(screen, m.files, mainPaneDimensions, m.selectedIdx, m.scrollOffset)
 	drawPane(screen, childFiles, rightPaneDimensions, 0, 0)
 }
 
@@ -476,23 +897,25 @@ func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions v4, selecte
 	}
 }
 
-func drawMarkHintSection(screen tcell.Screen, config *conf.Config) {
+func drawMarkHintSection(m model, screen tcell.Screen) {
 	w, h := screen.Size()
 
-	if len(marks) == 0 {
+	if len(m.marks) == 0 {
 		drawText(
 			screen,
 			v4{0, (h - 1), w, (h - 1)},
 			StyleInfo,
-			"No bookmarks set",
+			"No bookmarks set!",
 		)
+
+		return
 	}
 
-	drawFullLine(screen, (h-2)-len(marks), "Bookmarks", StyleInfo)
-	drawFullLine(screen, (h-1)-len(marks), "", StyleInfo)
+	drawFullLine(screen, (h-2)-len(m.marks), "Bookmarks", StyleInfo)
+	drawFullLine(screen, (h-1)-len(m.marks), "", StyleInfo)
 
-	index := len(marks) - 1
-	for entry, value := range marks {
+	index := len(m.marks) - 1
+	for entry, value := range m.marks {
 		drawFullLine(
 			screen,
 			(h-1)-index,
@@ -504,7 +927,7 @@ func drawMarkHintSection(screen tcell.Screen, config *conf.Config) {
 	}
 }
 
-func drawHintSection(screen tcell.Screen, config *conf.Config, keybindings []keybinding) {
+func drawHintSection(screen tcell.Screen, keybindings []keybinding) {
 	w, h := screen.Size()
 
 	index := len(keybindings) - 1
@@ -567,12 +990,12 @@ func drawFullLine(screen tcell.Screen, y int, text string, style tcell.Style) {
 }
 
 func drawHelpSection(screen tcell.Screen) {
-	// TODO: Find new lines and use that for the index.
 	_, h := screen.Size()
 	numLines := strings.Count(HelpMessage, "\n")
 	if len(HelpMessage) > 0 && !strings.HasSuffix(HelpMessage, "\n") {
 		numLines++
 	}
+
 	y := h - numLines
 	scanner := bufio.NewScanner(strings.NewReader(HelpMessage))
 
@@ -589,406 +1012,102 @@ func drawHelpSection(screen tcell.Screen) {
 	if err := scanner.Err(); err != nil {
 		slog.Error("encountered an error while reading help message", "err", err)
 	}
-	/*
-	 */
 }
 
-type keyHandlingResult struct {
-	shouldQuit    bool
-	addingNewMark bool
-	newPath       string
-}
-
-func handleKeyPress(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
-	result := keyHandlingResult{}
-
-	// Some terminals deliver Ctrl+C as \x03. Code point 3 is the ASCII ETX
-	// control character.
-	if ev.Key() == tcell.KeyCtrlC || ev.Rune() == 3 {
-		return keyHandlingResult{shouldQuit: true, newPath: currPath}, nil
-	}
-
-	var err error
-	switch currMode {
-	case ModeDefault:
-		result, err = handleKeyPressInDefault(ev, config)
-	case ModeSearch:
-		result, err = handleKeyPressInSearch(ev, config)
-	case ModeRecordingMark:
-		result, err = handleKeyPressInRecordingMark(ev, config)
-	case ModeListeningForMark:
-		result, err = handleKeyPressInListeningForMark(ev, config)
-	}
-
-	if err != nil {
-		return result, err
-	}
-
-	return result, nil
-}
-
-func handleKeyPressInDefault(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
-	result := keyHandlingResult{}
-
-	if waitingForAnotherKeyPress && !canKeyPressesBeChained(previousKeyPressed, string(ev.Rune())) {
-		// CLEANUP: Find a better reset value. With this reset value and with
-		// the fact that we're using ev.Rune(), users can't use the spacebar for
-		// chainable keybindings.
-		previousKeyPressed = " "
-		waitingForAnotherKeyPress = false
-	}
-
-	if searchBarPrefix == SearchBarPrefixSearched {
-		searchBarPrefix = SearchBarPrefixNavigating
-	}
-
-	switch ev.Rune() {
-	case 'q':
-		return keyHandlingResult{shouldQuit: true, newPath: currPath}, nil
-
-	case 'j':
-		handleKeyPressDown()
-
-	case 'k':
-		handleKeyPressUp()
-
-	case 'h':
-		handleKeyPressLeft(config)
-
-	case 'l':
-		handleKeyPressRight(config)
-
-	case '.':
-		config.ShowHiddenFiles = !config.ShowHiddenFiles
-		handleDirectoryChange(currPath, config)
-
-	case '/':
-		currMode = ModeSearch
-		searchBarPrefix = SearchBarPrefixSearching
-
-	case 'm':
-		currMode = ModeRecordingMark
-
-	case '\'':
-		currMode = ModeListeningForMark
-
-	case 'g':
-		if !waitingForAnotherKeyPress {
-			waitingForAnotherKeyPress = true
-			previousKeyPressed = "g"
-			break
-		}
-
-		if previousKeyPressed == "g" {
-			selectedIdx = 0
-			scrollOffset = 0
-		}
-
-		waitingForAnotherKeyPress = false
-
-	case 'c':
-		if !waitingForAnotherKeyPress {
-			waitingForAnotherKeyPress = true
-			previousKeyPressed = "c"
-			break
-		}
-
-		if previousKeyPressed == "c" && selectedIdx > 0 && selectedIdx < len(files) {
-			s := filepath.Join(currPath, files[selectedIdx].Name())
-			writeToClipboard(s)
-		}
-
-		waitingForAnotherKeyPress = false
-
-	case 'G':
-		if len(files) == 0 {
-			break
-		}
-
-		selectedIdx = len(files) - 1
-
-		_, screenHeight := screen.Size()
-		heightUsableForFiles := max(screenHeight-3, 1)
-		scrollOffset = max((len(files)-1)-(heightUsableForFiles-1), 0)
-
-	case 'n':
-		if previousKeyPressed == "c" && selectedIdx < len(files) {
-			writeToClipboard(files[selectedIdx].Name())
-		}
-
-		waitingForAnotherKeyPress = false
-
-	case 'd':
-		if previousKeyPressed == "c" && selectedIdx < len(files) {
-			writeToClipboard(filepath.Dir(currPath))
-		}
-
-		waitingForAnotherKeyPress = false
-
-	case '?':
-		shouldDisplayHelpSection = true
-	}
-
-	switch ev.Key() {
-	case tcell.KeyUp:
-		handleKeyPressUp()
-
-	case tcell.KeyDown:
-		handleKeyPressDown()
-
-	case tcell.KeyLeft:
-		handleKeyPressLeft(config)
-
-	case tcell.KeyRight:
-		handleKeyPressRight(config)
-
-	case tcell.KeyCtrlD:
-		if selectedIdx >= len(files)-1 {
-			break
-		}
-
-		selectedIdx = min(selectedIdx+BigJumpLength, len(files)-1)
-		scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
-
-	case tcell.KeyCtrlU:
-		if selectedIdx <= BigJumpLength {
-			selectedIdx = 0
-		} else {
-			selectedIdx = selectedIdx - BigJumpLength
-		}
-
-		scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
-
-	case tcell.KeyESC:
-		if currSearchEntry != "" {
-			currSearchEntry = ""
-			searchBarPrefix = SearchBarPrefixNavigating
-			handleDirectoryChange(currPath, config)
-		}
-
-		shouldDisplayHelpSection = false
-	}
-
-	return result, nil
-}
-
-func handleKeyPressInSearch(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
-	switch ev.Key() {
-	case tcell.KeyRune:
-		if ev.Rune() == '/' {
-			return keyHandlingResult{}, nil
-		}
-
-		// When in search mode, make sure the marker is at the top of the list.
-		// Since the marker should be at the top, the pane should be drawn as if
-		// both the selected index and the scroll offset are 0.
-		if strings.TrimSpace(currSearchEntry) == "" {
-			selectedIdx = 0
-			scrollOffset = 0
-		}
-
-		currSearchEntry = currSearchEntry + string(ev.Rune())
-		matches, err := searchInDir(currSearchEntry, files)
-		if err != nil {
-			return keyHandlingResult{}, err
-		}
-
-		updateFileListing(matches, config)
-
-	case tcell.KeyBackspace, 127:
-		if len(currSearchEntry) == 0 {
-			break
-		}
-
-		currDirFiles, err := os.ReadDir(currPath)
-		if err != nil {
-			return keyHandlingResult{}, err
-		}
-
-		if len(currSearchEntry) == 1 {
-			currSearchEntry = ""
-			handleFileListingChange(currDirFiles, config)
-		} else if ev.Modifiers()&tcell.ModAlt != 0 {
-			currSearchEntry = stringutil.DeletePreviousWord(currSearchEntry)
-			if currSearchEntry == "" {
-				handleFileListingChange(currDirFiles, config)
-			} else {
-				updateFileListingWithSearch(currSearchEntry, currDirFiles, config)
-			}
-		} else {
-			currSearchEntry = currSearchEntry[:len(currSearchEntry)-1]
-			updateFileListingWithSearch(currSearchEntry, currDirFiles, config)
-		}
-
-	case tcell.KeyCR:
-		currMode = ModeDefault
-
-		if strings.TrimSpace(currSearchEntry) == "" {
-			handleDirectoryChange(currPath, config)
-			break
-		}
-
-		// The user is now done with searching. Set the marker to point to the
-		// first entry.
-		selectedIdx = 0
-		scrollOffset = 0
-		searchBarPrefix = SearchBarPrefixSearched
-
-	case tcell.KeyESC:
-		// Disable search mode and ignore the current search string. This is
-		// consistent with how searching work in Vim.
-		currMode = ModeDefault
-		currSearchEntry = ""
-		searchBarPrefix = SearchBarPrefixNavigating
-		handleDirectoryChange(currPath, config)
-
-	case tcell.KeyTAB:
-		if len(files) == 0 {
-			break
-		}
-
-		firstMatch := files[0]
-		if firstMatch.IsDir() {
-			index, indexFound := getEntryIndexFromPath(currPath, firstMatch.Name(), config)
-			if !indexFound {
-				// TODO: Log error in screen.
-				break
-			}
-
-			positionHistory[currPath] = index
-			newPath := filepath.Join(currPath, firstMatch.Name())
-			handleDirectoryChange(newPath, config)
-			currPath = newPath
-
-			if indexFromHistory, ok := positionHistory[currPath]; ok {
-				selectedIdx = indexFromHistory
-			} else {
-				selectedIdx = 0
-			}
-		}
-
-		searchBarPrefix = SearchBarPrefixSearching
-		currSearchEntry = ""
-
-	case tcell.KeyBacktab:
-		handleKeyPressLeft(config)
-	}
-
-	return keyHandlingResult{shouldQuit: false, newPath: ""}, nil
-}
-
-func handleKeyPressInRecordingMark(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
-	result := keyHandlingResult{}
-	currMode = ModeDefault
-
-	if ev.Key() == tcell.KeyESC {
-		return result, nil
-	}
-
-	if ev.Key() != tcell.KeyRune {
-		return result, errors.New("setting mark: value for mark must be a rune")
-	}
-
-	err := storeNewMark(ev.Rune(), currPath, config)
-	if err != nil {
-		return result, err
-	}
-
-	currMode = ModeDefault
-	result.addingNewMark = true
-
-	return result, nil
-}
-
-func handleKeyPressInListeningForMark(ev *tcell.EventKey, config *conf.Config) (keyHandlingResult, error) {
-	result := keyHandlingResult{}
-	currMode = ModeDefault
-
-	if ev.Key() == tcell.KeyESC {
-		return result, nil
-	}
-
-	if ev.Key() != tcell.KeyRune {
-		return result, errors.New("listening for mark: value for mark must be a rune")
-	}
-
-	r := ev.Rune()
-	path, ok := marks[r]
+func canKeyPressesBeChained(key1, key2 string) bool {
+	chainableWithKey1, ok := ChainableKeybindings[key1]
 	if !ok {
-		return result, errors.New(fmt.Sprintf("listening for mark: %q is not set", r))
+		return false
 	}
 
-	f, err := os.Open(path)
-	if err != nil {
-		return result, errors.New(fmt.Sprintf("%q is not a valid file", path))
-	}
-	defer f.Close()
-
-	currPath = path
-	handleDirectoryChange(currPath, config)
-	selectedIdx = 0
-	scrollOffset = 0
-	currSearchEntry = ""
-
-	return result, nil
-}
-
-func handleKeyPressDown() {
-	if len(files) == 0 {
-		return
-	}
-
-	selectedIdx = (selectedIdx + 1) % len(files)
-	scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
-}
-
-func handleKeyPressUp() {
-	if len(files) == 0 {
-		return
-	}
-
-	selectedIdx = (selectedIdx - 1 + len(files)) % len(files)
-	scrollOffset = calculateScrollOffset(screen, selectedIdx, scrollOffset, len(files))
-}
-
-func handleKeyPressLeft(config *conf.Config) {
-	positionHistory[currPath] = selectedIdx
-
-	oldPath := currPath
-	newPath := filepath.Dir(currPath)
-	currPath = newPath
-	currSearchEntry = ""
-
-	indexFromHistory, ok := positionHistory[newPath]
-	if !ok {
-		for i, f := range files {
-			if f.Name() == filepath.Base(oldPath) {
-				selectedIdx = i
-			}
+	for _, k := range chainableWithKey1 {
+		if k.key == key2 {
+			return true
 		}
+	}
+
+	return false
+}
+
+// TODO: Reduce parameter count.
+func getEntryIndexFromPath(m model, path, entryToLookFor string, config *conf.Config) (int, bool) {
+	pathEntries, err := os.ReadDir(path)
+	if err != nil {
+		slog.Debug("failed to read directory entries", "err", err, "currPath", m.currPath)
+		return -1, false
+	}
+
+	index := 0
+	for _, entry := range pathEntries {
+		if !config.ShowHiddenFiles && strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+
+		if entry.Name() == entryToLookFor {
+			return index, true
+		}
+
+		index++
+	}
+
+	return -1, false
+}
+
+func getDirEntries(path string, config *conf.Config) []fs.DirEntry {
+	result := []fs.DirEntry{}
+
+	if strings.TrimSpace(path) == "" {
+		return result
+	}
+
+	rawFiles, err := os.ReadDir(path)
+	if err != nil {
+		// TODO: Return an error value here and display it on the screen.
+		slog.Debug("Failed to read directory", "path", path, "err", err)
+		return result
+	}
+
+	if config.ShowHiddenFiles {
+		result = rawFiles
 	} else {
-		selectedIdx = indexFromHistory
-	}
+		result = []fs.DirEntry{}
 
-	handleDirectoryChange(currPath, config)
-}
-
-func handleKeyPressRight(config *conf.Config) {
-	currSearchEntry = ""
-
-	if selectedIdx < len(files) && files[selectedIdx].IsDir() {
-		parentScrollOffset = scrollOffset
-		positionHistory[currPath] = selectedIdx
-
-		currPath = filepath.Join(currPath, files[selectedIdx].Name())
-		handleDirectoryChange(currPath, config)
-
-		if indexFromHistory, ok := positionHistory[currPath]; ok {
-			selectedIdx = indexFromHistory
-		} else {
-			selectedIdx = 0
+		for _, f := range rawFiles {
+			if !strings.HasPrefix(f.Name(), ".") {
+				result = append(result, f)
+			}
 		}
 	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name() < result[j].Name()
+	})
+
+	return result
+}
+
+func searchInDir(pattern string, candidateFiles []fs.DirEntry) ([]fs.DirEntry, error) {
+	if len(candidateFiles) == 0 {
+		return []fs.DirEntry{}, nil
+	}
+	// PERF: Use better/custom data structures to avoid these transformations.
+	result := []fs.DirEntry{}
+	candidates := []string{}
+	candidatesMap := make(map[string]fs.DirEntry)
+
+	for _, f := range candidateFiles {
+		candidates = append(candidates, f.Name())
+		candidatesMap[f.Name()] = f
+	}
+
+	matches := fuzzy.Find(pattern, candidates)
+	for _, match := range matches {
+		if dirEntry, ok := candidatesMap[match.CandidateString]; ok {
+			result = append(result, dirEntry)
+		}
+	}
+
+	return result, nil
 }
 
 func storeNewMark(r rune, path string, config *conf.Config) error {
@@ -1010,7 +1129,7 @@ func storeNewMark(r rune, path string, config *conf.Config) error {
 		}
 
 		if string(r) == parts[0] {
-			return errors.New(fmt.Sprintf("recording mark: rune %q is already used", r))
+			return fmt.Errorf("recording mark: rune %q is already used", r)
 		}
 	}
 
@@ -1066,149 +1185,4 @@ func readMarks(config *conf.Config) (map[rune]string, error) {
 	err = scanner.Err()
 
 	return result, err
-}
-
-func calculateScrollOffset(screen tcell.Screen, selectedIdx, currScrollOffset, listLen int) int {
-	_, screenHeight := screen.Size()
-	heightUsableForFiles := max(screenHeight-3, 1)
-
-	return calculateScrollOffsetForHeight(selectedIdx, scrollOffset, heightUsableForFiles, len(files))
-}
-
-// BUG: Wrapping is buggy right now. Try wrapping in a directory with a lot of files.
-func calculateScrollOffsetForHeight(selectedIdx, currScrollOffset, heightUsableForFiles, listLen int) int {
-	result := 0
-
-	if selectedIdx < currScrollOffset {
-		// Gone over the top edge. The scroll marker should be where the current
-		// file marker is.
-		result = selectedIdx
-	} else if selectedIdx >= currScrollOffset+heightUsableForFiles {
-		// Gone over the bottom edge. Since the file marker is at the bottom,
-		// the scroll marker should be (heightUsableForFileList - 1) rows behind
-		// the file marker.
-		result = selectedIdx - (heightUsableForFiles - 1)
-	} else {
-		// Keep the scroll offset the same as long as the edges are not being touched.
-		result = currScrollOffset
-	}
-
-	maxOffset := max((listLen-1)-(heightUsableForFiles-1), 0)
-
-	return min(result, maxOffset)
-}
-
-func searchInDir(pattern string, candidateFiles []fs.DirEntry) ([]fs.DirEntry, error) {
-	if len(candidateFiles) == 0 {
-		return []fs.DirEntry{}, nil
-	}
-	// PERF: Use better/custom data structures to avoid these transformations.
-	result := []fs.DirEntry{}
-	candidates := []string{}
-	candidatesMap := make(map[string]fs.DirEntry)
-
-	for _, f := range candidateFiles {
-		candidates = append(candidates, f.Name())
-		candidatesMap[f.Name()] = f
-	}
-
-	matches := fuzzy.Find(pattern, candidates)
-	for _, match := range matches {
-		if dirEntry, ok := candidatesMap[match.CandidateString]; ok {
-			result = append(result, dirEntry)
-		}
-	}
-
-	return result, nil
-}
-
-func render(keyChangesChan chan *tcell.EventKey, errorChan chan error, config *conf.Config) {
-	for {
-		select {
-		case eventKey := <-keyChangesChan:
-			slog.Debug("render", "keyRune", eventKey.Rune(), "keyString", string(eventKey.Rune()), "currMode", currMode, "positionHistory", positionHistory)
-
-			switch currMode {
-			case ModeDefault:
-				renderForDefaultMode(screen, config)
-
-			case ModeSearch:
-				drawFileList(screen, config)
-				drawShortHelpLine(screen)
-
-			case ModeRecordingMark:
-				drawFileList(screen, config)
-				drawStatusLine(screen, "Listening for mark...", StyleAttention)
-
-			case ModeListeningForMark:
-				drawFileList(screen, config)
-				drawMarkHintSection(screen, config)
-			}
-
-			screen.Show()
-
-		case err := <-errorChan:
-			renderForDefaultMode(screen, config)
-			drawStatusLine(screen, err.Error(), StyleError)
-			screen.Show()
-		}
-	}
-}
-
-func renderForDefaultMode(screen tcell.Screen, config *conf.Config) {
-	drawFileList(screen, config)
-
-	if waitingForAnotherKeyPress {
-		keybindings, ok := ChainableKeybindings[previousKeyPressed]
-		if ok {
-			drawHintSection(screen, config, keybindings)
-		} else {
-			drawShortHelpLine(screen)
-		}
-
-		return
-	} else if shouldDisplayHelpSection {
-		drawHelpSection(screen)
-		return
-	}
-
-	drawShortHelpLine(screen)
-}
-
-func canKeyPressesBeChained(key1, key2 string) bool {
-	chainableWithKey1, ok := ChainableKeybindings[key1]
-	if !ok {
-		return false
-	}
-
-	for _, k := range chainableWithKey1 {
-		if k.key == key2 {
-			return true
-		}
-	}
-
-	return false
-}
-
-func getEntryIndexFromPath(path, entryToLookFor string, config *conf.Config) (int, bool) {
-	pathEntries, err := os.ReadDir(path)
-	if err != nil {
-		slog.Debug("failed to read directory entries", "err", err, "currPath", currPath)
-		return -1, false
-	}
-
-	index := 0
-	for _, entry := range pathEntries {
-		if !config.ShowHiddenFiles && strings.HasPrefix(entry.Name(), ".") {
-			continue
-		}
-
-		if entry.Name() == entryToLookFor {
-			return index, true
-		}
-
-		index++
-	}
-
-	return -1, false
 }

@@ -118,4 +118,4 @@ Pathsurfer is released under [the MIT license](./LICENSE).
 
 ---
 
-_Everything hand-written: code, docs, and typos._
+_Code, docs, and silly typos have all been written by a human._

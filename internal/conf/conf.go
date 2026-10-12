@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 )
 
 var (
@@ -15,8 +16,11 @@ var (
 	version   string
 )
 
+const DefaultBigJumpLength = 22
+
 var DefaultLogFilePath string
 var DefaultMarkFilePath string
+var InitialPath string
 
 const (
 	ProgramName = "pathsurfer"
@@ -27,6 +31,7 @@ type Config struct {
 	LogFilePath     string
 	MarkFilePath    string
 	ShowHiddenFiles bool
+	BigJumpLength   int
 }
 
 func init() {
@@ -48,6 +53,21 @@ func init() {
 		ProgramName,
 		fmt.Sprintf("%s.mark", ProgramName),
 	)
+
+	if len(flag.Args()) > 0 {
+		pathArg := strings.TrimSpace(flag.Args()[0])
+
+		pathDirInfo, err := os.Stat(pathArg)
+		if os.IsNotExist(err) {
+			log.Fatalf("%q does not exist", pathArg)
+		} else if err != nil {
+			log.Fatalf("%q is not a valid path: %v", pathArg, err)
+		} else if !pathDirInfo.IsDir() {
+			log.Fatalf("%q is not a valid directory", pathArg)
+		}
+
+		InitialPath = pathArg
+	}
 }
 
 func Init() (*Config, error) {
@@ -87,6 +107,12 @@ func Init() (*Config, error) {
 		"mark-file",
 		DefaultMarkFilePath,
 		"The path of the file used for storing marks",
+	)
+	flag.IntVar(
+		&result.BigJumpLength,
+		"big-jump-length",
+		DefaultBigJumpLength,
+		"Number of lines to move on a big jump",
 	)
 
 	displayVersion := flag.Bool(
