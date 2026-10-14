@@ -1,5 +1,13 @@
 <div align="center">
   <img src="/docs/imgs/logo.png" alt="logo">
+  <br />
+  <a href="#features">Features</a>
+  ·
+  <a href="#keybindings">Keybindings</a>
+  ·
+  <a href="#contributing">Contributing</a>
+  ·
+  <a href="#license">License</a>
 </div>
 
 # pathsurfer
