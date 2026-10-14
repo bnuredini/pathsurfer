@@ -9,6 +9,7 @@
   <a href="#contributing">Contributing</a>
   ·
   <a href="#license">License</a>
+  <br />
 </div>
 
 > [!WARNING]
