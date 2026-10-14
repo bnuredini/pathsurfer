@@ -40,9 +40,9 @@ jobs:
           mkdir -p packaged
 
           if [ "$GOOS" = "windows" ]; then
-            (cd bin && zip "../packaged/pathsurfer-${GOOS}-${GOARCH}.zip" ./pathsurfer.exe)
+            (cd build && zip "../packaged/pathsurfer-${GOOS}-${GOARCH}.zip" ./pathsurfer.exe)
           else
-            tar -C bin -czf "packaged/pathsurfer-${GOOS}-${GOARCH}.tar.gz" ./pathsurfer
+            tar -C build -czf "packaged/pathsurfer-${GOOS}-${GOARCH}.tar.gz" ./pathsurfer
           fi
         env:
           GOOS: ${{ matrix.os }}
@@ -70,4 +70,3 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: packaged/*
-
