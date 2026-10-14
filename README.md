@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="/docs/imgs/logo.png" alt="logo">
+</div>
+
 # pathsurfer
 
 > [!WARNING]
@@ -118,4 +122,4 @@ Pathsurfer is released under [the MIT license](./LICENSE).
 
 ---
 
-_Code, docs, and silly typos have all been written by a human._
+_Code, docs, and silly typos were all written by a human._
