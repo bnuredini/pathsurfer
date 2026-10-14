@@ -6,8 +6,6 @@
   ·
   <a href="#keybindings">Keybindings</a>
   ·
-  <a href="#contributing">Contributing</a>
-  ·
   <a href="#license">License</a>
   <br />
 </div>
@@ -24,11 +22,24 @@ defaults, support for fuzzy finding, Vi-like keybindings, and shell integration.
 
 ## Features
 
-* Directory navigation
-* Fuzzy finding
-* Vi-like keybindings
-* Configurable settings
-* Integration with bash, zsh, and fish for fast directory navigation
+- Directory navigation
+- Fuzzy finding
+- Vi-like keybindings
+- Configurable settings
+- Integration with bash, zsh, and fish for fast directory navigation
+
+## Non-features
+
+Pathsurfer is intentionally small. Its purpose is to make filesystem navigation easier and faster.
+Because of this small feature set, keybindings are sharp, allowing you to serve it's purpose
+efficiently.
+
+Here's a set of features this program doesn't include on purpose:
+
+* File management
+* Tabs
+* Rendering images
+* A powerful scripting language for configuration
 
 ## Keybindings
 
@@ -37,7 +48,7 @@ defaults, support for fuzzy finding, Vi-like keybindings, and shell integration.
 | Action              | Key                              | Description                                                   |
 | ------------------- | -------------------------------- | ------------------------------------------------------------- |
 | Move down           | <kbd>j</kbd> / <kbd>&darr;</kbd> | Move down in the file list                                    |
-| Move up             | <kbd>k</kbd> / <kbd>&uarr;</kbd>  | Move up in the file list                                      |
+| Move up             | <kbd>k</kbd> / <kbd>&uarr;</kbd> | Move up in the file list                                      |
 | Go back             | <kbd>h</kbd> / <kbd>&larr;</kbd> | Go back one directory                                         |
 | Go forward          | <kbd>l</kbd> / <kbd>&rarr;</kbd> | Change into a directory                                       |
 | Search              | <kbd>/</kbd>                     | Enter search mode                                             |
@@ -53,7 +64,7 @@ defaults, support for fuzzy finding, Vi-like keybindings, and shell integration.
 ### Search mode
 
 | Action              | Key                  | Description                                                          |
-| ------------------- | -------------------- | -------------------------------------------------------------        |
+| ------------------- | -------------------- | -------------------------------------------------------------------- |
 | Confirm search      | <kbd>Enter</kbd>     | Escape out of search mode and view the results of the search pattern |
 | Enter top directory | <kbd>TAB</kbd>       | Enter in to the directory showing up as the top search result        |
 | Go back             | <kbd>Shift+TAB</kbd> | Go back one directory                                                |
