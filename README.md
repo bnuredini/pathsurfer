@@ -1,6 +1,7 @@
 <div align="center">
   <img src="/docs/imgs/logo.png" alt="logo">
   <br />
+  <br />
   <a href="#features">Features</a>
   ·
   <a href="#keybindings">Keybindings</a>
@@ -9,8 +10,6 @@
   ·
   <a href="#license">License</a>
 </div>
-
-# pathsurfer
 
 > [!WARNING]
 > This is <b>pre-alpha software</b>: expect behavior changes until a stable release.
