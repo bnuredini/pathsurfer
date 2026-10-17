@@ -8,7 +8,6 @@ import (
 
 func writeToClipboard(s string) error {
 	cmd := exec.Command("pbcopy")
-
 	input, err := cmd.StdinPipe()
 	if err != nil {
 		return err
@@ -18,11 +17,11 @@ func writeToClipboard(s string) error {
 		return err
 	}
 
-	if _, err = input.Write([]byte(s)); err != nil {
+	if _, err := input.Write([]byte(s)); err != nil {
 		return err
 	}
 
-	if err = input.Close(); err != nil {
+	if err := input.Close(); err != nil {
 		return err
 	}
 

@@ -432,7 +432,10 @@ func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (
 
 	case 'n':
 		if m.previousKeyPressed == "c" && m.selectedIdx < len(m.files) {
-			writeToClipboard(m.files[m.selectedIdx].Name())
+			err := writeToClipboard(m.files[m.selectedIdx].Name())
+			if err != nil {
+				return m, err
+			}
 		}
 
 		m.waitingForAnotherKeyPress = false
