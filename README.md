@@ -2,6 +2,8 @@
   <img src="/docs/imgs/logo.png" alt="logo">
   <br />
   <br />
+  <a href="#about">About</a>
+  .
   <a href="#features">Features</a>
   ·
   <a href="#keybindings">Keybindings</a>
@@ -13,12 +15,14 @@
 > [!WARNING]
 > This is <b>pre-alpha software</b>: expect behavior changes until a stable release.
 
-A tiny terminal utility for fast directory navigating. Built to work out of the box with sensible
-defaults, support for fuzzy finding, Vi-like keybindings, and shell integration.
-
 <img src="https://github.com/bnuredini/pathsurfer/blob/master/docs/imgs/screenshot1.png" alt="pathsurfer screenshot">
 
 ---
+
+## About
+
+Pathsurfer is tiny terminal utility for fast directory navigating. Built to work out of the box with
+sensible defaults, support for fuzzy finding, Vi-like keybindings, and shell integration.
 
 ## Features
 
@@ -31,7 +35,7 @@ defaults, support for fuzzy finding, Vi-like keybindings, and shell integration.
 ## Non-features
 
 Pathsurfer is intentionally small. Its purpose is to make filesystem navigation easier and faster.
-Because of this small feature set, keybindings are sharp, allowing you to serve it's purpose
+Because of this small feature set, keybindings are sharp, allowing you to get navigate through path
 efficiently.
 
 Here's a set of features this program doesn't include on purpose:
@@ -39,7 +43,7 @@ Here's a set of features this program doesn't include on purpose:
 * File management
 * Tabs
 * Rendering images
-* A powerful scripting language for configuration
+* Configuration via scripting
 
 ## Keybindings
 
@@ -75,8 +79,6 @@ Here's a set of features this program doesn't include on purpose:
 Building and integrating pathsurfer is easy: using Make, you'll just need to run one command to
 build the binary and one command to integrate with your shell.
 
-### Option #1: Using `make`
-
 To build and install, run:
 
 ```bash
@@ -95,7 +97,8 @@ Depending on which shell you use, run one of the following to integrate pathsurf
 
 Shell integration is what allows you to change directories when quitting the program.
 
-### Option #2: Using `go`
+<details>
+<summary>Building without `make`</summary>
 
 If you don't have `make` in your system, you can build Pathsurfer using the Go toolchain directly:
 
@@ -116,6 +119,7 @@ To integrate with fish, run:
 ```bash
 install -m 644 ./scripts/psurf.fish ~/.config/fish/conf.d/psurf.fish
 ```
+</details>
 
 <details>
 <summary>Cleaning up</summary>
@@ -141,4 +145,4 @@ Pathsurfer is released under [the MIT license](./LICENSE).
 
 ---
 
-_Code, docs, and silly typos were all written by a human._
+_Hand-written code, docs, and typos._
