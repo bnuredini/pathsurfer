@@ -26,11 +26,11 @@ sensible defaults, support for fuzzy finding, Vi-like keybindings, and shell int
 
 ## Features
 
-- Directory navigation
-- Fuzzy finding
-- Vi-like keybindings
-- Configurable settings
-- Integration with bash, zsh, and fish for fast directory navigation
+* Directory navigation
+* Fuzzy finding
+* Vi-like keybindings
+* Configurable settings
+* Integration with bash, zsh, and fish for fast directory navigation
 
 ## Non-features
 
