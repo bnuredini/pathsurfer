@@ -1,12 +1,12 @@
 //go:build darwin
 
-package main
+package clipboard
 
 import (
 	"os/exec"
 )
 
-func writeToClipboard(s string) error {
+func Write(s string) error {
 	cmd := exec.Command("pbcopy")
 	input, err := cmd.StdinPipe()
 	if err != nil {

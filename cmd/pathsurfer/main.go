@@ -19,6 +19,7 @@ import (
 	"github.com/bnuredini/pathsurfer/internal/conf"
 	"github.com/bnuredini/pathsurfer/internal/fuzzy"
 	"github.com/bnuredini/pathsurfer/internal/stringutil"
+	"github.com/bnuredini/pathsurfer/internal/clipboard"
 )
 
 type v4 struct {
@@ -414,7 +415,7 @@ func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (
 
 		if m.previousKeyPressed == "c" && m.selectedIdx > 0 && m.selectedIdx < len(m.files) {
 			s := filepath.Join(m.currPath, m.files[m.selectedIdx].Name())
-			writeToClipboard(s)
+			clipboard.Write(s)
 		}
 
 		m.waitingForAnotherKeyPress = false
@@ -432,7 +433,7 @@ func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (
 
 	case 'n':
 		if m.previousKeyPressed == "c" && m.selectedIdx < len(m.files) {
-			err := writeToClipboard(m.files[m.selectedIdx].Name())
+			err := clipboard.Write(m.files[m.selectedIdx].Name())
 			if err != nil {
 				return m, err
 			}
@@ -442,7 +443,7 @@ func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (
 
 	case 'd':
 		if m.previousKeyPressed == "c" && m.selectedIdx < len(m.files) {
-			writeToClipboard(filepath.Dir(m.currPath))
+			clipboard.Write(filepath.Dir(m.currPath))
 		}
 
 		m.waitingForAnotherKeyPress = false

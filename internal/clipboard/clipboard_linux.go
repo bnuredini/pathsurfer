@@ -1,6 +1,6 @@
 //go:build linux
 
-package main
+package clipboard
 
 import (
 	"exec"
@@ -15,7 +15,7 @@ func init() {
 }
 
 // TODO: Add clipboard support for xsel, Wayland, etc.
-func writeToClipboard(s string) error {
+func Write(s string) error {
 	if missingSupport {
 		return err.New("missing xclip support")
 	}
