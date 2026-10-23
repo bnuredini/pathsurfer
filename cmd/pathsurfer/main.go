@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"errors"
+	"unicode/utf8"
 	"fmt"
 	"io/fs"
 	"log"
@@ -14,7 +15,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/gdamore/tcell/v2"
+	"github.com/gdamore/tcell/v3"
+	"github.com/gdamore/tcell/v3/color"
 
 	"github.com/bnuredini/pathsurfer/internal/conf"
 	"github.com/bnuredini/pathsurfer/internal/fuzzy"
@@ -75,13 +77,13 @@ type model struct {
 }
 
 var (
-	StylePathIndicator       = tcell.StyleDefault.Foreground(tcell.ColorGray)
-	StyleActivePathIndicator = tcell.StyleDefault.Foreground(tcell.ColorBlue)
-	StyleReset               = tcell.StyleDefault.Background(tcell.ColorReset).Foreground(tcell.ColorReset)
-	StyleError               = tcell.StyleDefault.Foreground(tcell.ColorWhite).Background(tcell.ColorDarkRed)
-	StyleInfo                = tcell.StyleDefault.Foreground(tcell.ColorYellow)
-	StyleAttention           = tcell.StyleDefault.Background(tcell.ColorSteelBlue).Foreground(tcell.ColorWhite)
-	StyleSelectedEntry       = tcell.StyleDefault.Background(tcell.ColorDarkBlue).Foreground(tcell.ColorWhite)
+	StylePathIndicator       = tcell.StyleDefault.Foreground(color.Gray)
+	StyleActivePathIndicator = tcell.StyleDefault.Foreground(color.Blue)
+	StyleReset               = tcell.StyleDefault.Background(color.Reset).Foreground(color.Reset)
+	StyleError               = tcell.StyleDefault.Foreground(color.White).Background(color.DarkRed)
+	StyleInfo                = tcell.StyleDefault.Foreground(color.Yellow)
+	StyleAttention           = tcell.StyleDefault.Background(color.SteelBlue).Foreground(color.White)
+	StyleSelectedEntry       = tcell.StyleDefault.Background(color.DarkBlue).Foreground(color.White)
 )
 
 var RunesThatTriggerRedrawInDefault = []rune{
@@ -197,7 +199,7 @@ func main() {
 
 	running := true
 	for running {
-		ev := screen.PollEvent()
+		ev := <-screen.EventQ()
 
 		switch ev := ev.(type) {
 		case *tcell.EventResize:
@@ -209,7 +211,7 @@ func main() {
 			render(m, config)
 
 		case *tcell.EventKey:
-			slog.Debug("main loop", "keyRune", ev.Rune(), "keyString", string(ev.Rune()), "currMode", m.currMode, "positionHistory", m.positionHistory)
+			slog.Debug("main loop", "keyRune", ev.Str(), "keyString", string(ev.Str()), "currMode", m.currMode, "positionHistory", m.positionHistory)
 
 			var err error
 			m, err = handleKeyPress(m, ev, config)
@@ -327,9 +329,7 @@ func updateFileListingWithSearch(m model, files []fs.DirEntry, config *conf.Conf
 }
 
 func handleKeyPress(m model, ev *tcell.EventKey, config *conf.Config) (model, error) {
-	// Some terminals deliver Ctrl+C as \x03. Code point 3 is the ASCII ETX
-	// control character.
-	if ev.Key() == tcell.KeyCtrlC || ev.Rune() == 3 {
+	if ev.Key() == tcell.KeyCtrlC {
 		return m, nil
 	}
 
@@ -349,7 +349,7 @@ func handleKeyPress(m model, ev *tcell.EventKey, config *conf.Config) (model, er
 }
 
 func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (model, error) {
-	if m.waitingForAnotherKeyPress && !canKeyPressesBeChained(m.previousKeyPressed, string(ev.Rune())) {
+	if m.waitingForAnotherKeyPress && !canKeyPressesBeChained(m.previousKeyPressed, ev.Str()) {
 		// CLEANUP: Find a better reset value. With this reset value and with
 		// the fact that we're using ev.Rune(), users can't use the spacebar for
 		// chainable keybindings.
@@ -361,38 +361,38 @@ func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (
 		m.searchBarPrefix = SearchBarPrefixNavigating
 	}
 
-	switch ev.Rune() {
-	case 'q':
+	switch ev.Str() {
+	case "q":
 		m.shouldQuit = true
 		return m, nil
 
-	case 'j':
+	case "j":
 		m = handleKeyPressDown(m)
 
-	case 'k':
+	case "k":
 		m = handleKeyPressUp(m)
 
-	case 'h':
+	case "h":
 		m = handleKeyPressLeft(m, config)
 
-	case 'l':
+	case "l":
 		m = handleKeyPressRight(m, config)
 
-	case '.':
+	case ".":
 		config.ShowHiddenFiles = !config.ShowHiddenFiles
 		m = handleDirectoryChange(m, m.currPath, config)
 
-	case '/':
+	case "/":
 		m.currMode = ModeSearch
 		m.searchBarPrefix = SearchBarPrefixSearching
 
-	case 'm':
+	case "m":
 		m.currMode = ModeRecordingMark
 
-	case '\'':
+	case "'":
 		m.currMode = ModeListeningForMark
 
-	case 'g':
+	case "g":
 		if !m.waitingForAnotherKeyPress {
 			m.waitingForAnotherKeyPress = true
 			m.previousKeyPressed = "g"
@@ -406,7 +406,7 @@ func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (
 
 		m.waitingForAnotherKeyPress = false
 
-	case 'c':
+	case "c":
 		if !m.waitingForAnotherKeyPress {
 			m.waitingForAnotherKeyPress = true
 			m.previousKeyPressed = "c"
@@ -420,7 +420,7 @@ func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (
 
 		m.waitingForAnotherKeyPress = false
 
-	case 'G':
+	case "G":
 		if len(m.files) == 0 {
 			break
 		}
@@ -431,7 +431,7 @@ func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (
 		heightUsableForFiles := max(screenHeight-3, 1)
 		m.scrollOffset = max((len(m.files)-1)-(heightUsableForFiles-1), 0)
 
-	case 'n':
+	case "n":
 		if m.previousKeyPressed == "c" && m.selectedIdx < len(m.files) {
 			err := clipboard.Write(m.files[m.selectedIdx].Name())
 			if err != nil {
@@ -441,14 +441,14 @@ func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (
 
 		m.waitingForAnotherKeyPress = false
 
-	case 'd':
+	case "d":
 		if m.previousKeyPressed == "c" && m.selectedIdx < len(m.files) {
 			clipboard.Write(filepath.Dir(m.currPath))
 		}
 
 		m.waitingForAnotherKeyPress = false
 
-	case '?':
+	case "?":
 		m.shouldDisplayHelpSection = true
 	}
 
@@ -498,7 +498,7 @@ func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (
 func handleKeyPressInSearch(m model, ev *tcell.EventKey, config *conf.Config) (model, error) {
 	switch ev.Key() {
 	case tcell.KeyRune:
-		if ev.Rune() == '/' {
+		if ev.Str() == "/" {
 			return m, nil
 		}
 
@@ -510,7 +510,7 @@ func handleKeyPressInSearch(m model, ev *tcell.EventKey, config *conf.Config) (m
 			m.scrollOffset = 0
 		}
 
-		m.currSearchEntry = m.currSearchEntry + string(ev.Rune())
+		m.currSearchEntry = m.currSearchEntry + string(ev.Str())
 		matches, err := searchInDir(m.currSearchEntry, m.files)
 		if err != nil {
 			return m, err
@@ -610,7 +610,8 @@ func handleKeyPressInRecordingMark(m model, ev *tcell.EventKey, config *conf.Con
 		return m, errors.New("setting mark: value for mark must be a rune")
 	}
 
-	err := storeNewMark(ev.Rune(), m.currPath, config)
+	r, _ := utf8.DecodeRuneInString(ev.Str())
+	err := storeNewMark(r, m.currPath, config)
 	if err != nil {
 		return m, err
 	}
@@ -631,7 +632,7 @@ func handleKeyPressInListeningForMark(m model, ev *tcell.EventKey, config *conf.
 		return m, errors.New("listening for mark: value for mark must be a rune")
 	}
 
-	r := ev.Rune()
+	r, _ := utf8.DecodeRuneInString(ev.Str())
 	path, ok := m.marks[r]
 	if !ok {
 		return m, fmt.Errorf("listening for mark: %q is not set", r)
@@ -886,7 +887,7 @@ func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions v4, selecte
 
 		if file.IsDir() {
 			prefix = "📁 "
-			style = style.Foreground(tcell.ColorGreen)
+			style = style.Foreground(color.Green)
 		}
 		if fileIdx == selectedMarker {
 			style = StyleSelectedEntry
