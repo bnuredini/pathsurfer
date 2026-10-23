@@ -39,9 +39,8 @@ const (
 type SearchBarPrefix string
 
 const (
-	SearchBarPrefixSearching  = "searching"
-	SearchBarPrefixSearched   = "searched"
-	SearchBarPrefixNavigating = "navigating"
+	SearchBarPrefixSearching = "searching"
+	SearchBarPrefixSearched  = "searched"
 )
 
 var screen tcell.Screen
@@ -203,7 +202,6 @@ func main() {
 
 		switch ev := ev.(type) {
 		case *tcell.EventResize:
-			screen.Sync()
 			drawFileList(m, screen, config)
 			drawShortHelpLine(screen)
 			screen.Show()
@@ -242,7 +240,6 @@ func initModel(config *conf.Config) model {
 	m := model{}
 
 	m.positionHistory = make(map[string]int)
-	m.searchBarPrefix = SearchBarPrefixNavigating
 
 	if strings.TrimSpace(conf.InitialPath) == "" {
 		var err error
@@ -357,7 +354,7 @@ func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (
 	}
 
 	if m.searchBarPrefix == SearchBarPrefixSearched {
-		m.searchBarPrefix = SearchBarPrefixNavigating
+		m.searchBarPrefix = ""
 	}
 
 	switch ev.Str() {
@@ -483,7 +480,7 @@ func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (
 	case tcell.KeyESC:
 		if m.currSearchEntry != "" {
 			m.currSearchEntry = ""
-			m.searchBarPrefix = SearchBarPrefixNavigating
+			m.searchBarPrefix = ""
 			m = handleDirectoryChange(m, config)
 		}
 
@@ -559,7 +556,7 @@ func handleKeyPressInSearch(m model, ev *tcell.EventKey, config *conf.Config) (m
 		// consistent with how searching work in Vim.
 		m.currMode = ModeDefault
 		m.currSearchEntry = ""
-		m.searchBarPrefix = SearchBarPrefixNavigating
+		m.searchBarPrefix = ""
 		m = handleDirectoryChange(m, config)
 
 	case tcell.KeyTAB:
@@ -802,19 +799,19 @@ func drawFileList(m model, screen tcell.Screen, config *conf.Config) {
 
 	leftPaneDimensions := v4{
 		x1: 0,
-		y1: 2,
+		y1: 1,
 		x2: secondaryPaneWidth,
 		y2: h - 1,
 	}
 	mainPaneDimensions := v4{
 		x1: leftPaneDimensions.x2 + 2,
-		y1: 2,
+		y1: 1,
 		x2: leftPaneDimensions.x2 + (3 * secondaryPaneWidth),
 		y2: h - 1,
 	}
 	rightPaneDimensions := v4{
 		x1: mainPaneDimensions.x2 + 2,
-		y1: 2,
+		y1: 1,
 		x2: mainPaneDimensions.x2 + (2 * secondaryPaneWidth),
 		y2: h - 1,
 	}
@@ -827,16 +824,22 @@ func drawFileList(m model, screen tcell.Screen, config *conf.Config) {
 		screen.SetContent(sep2X, i+1, '|', nil, tcell.StyleDefault)
 	}
 
-	dimensions := v4{x1: mainPaneDimensions.x1, y1: 0, x2: w, y2: 0}
-	text := fmt.Sprintf(" %s: %s/%s", m.searchBarPrefix, m.currPath, m.currSearchEntry)
-	switch m.currMode {
-	case ModeSearch:
-		drawText(screen, dimensions, StyleActivePathIndicator, text)
-		screen.ShowCursor(dimensions.x1+len(text), dimensions.y1)
-		screen.SetCursorStyle(tcell.CursorStyleBlinkingBlock)
-	default:
-		drawText(screen, dimensions, StylePathIndicator, text)
-		screen.HideCursor()
+	{
+		dimensions := v4{x1: 0, y1: 0, x2: w, y2: 0}
+		text := fmt.Sprintf("%s/%s", m.currPath, m.currSearchEntry)
+		if m.searchBarPrefix != "" {
+			text = fmt.Sprintf("%s: %s", m.searchBarPrefix, text)
+		}
+		
+		switch m.currMode {
+		case ModeSearch:
+			drawText(screen, dimensions, StyleActivePathIndicator, text)
+			screen.ShowCursor(dimensions.x1+len(text), dimensions.y1)
+			screen.SetCursorStyle(tcell.CursorStyleBlinkingBlock)
+		default:
+			drawText(screen, dimensions, StylePathIndicator, text)
+			screen.HideCursor()
+		}
 	}
 
 	parentSelectedIdx := 0
