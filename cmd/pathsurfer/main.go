@@ -189,6 +189,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	screen.SetTitle("pathsurfer")
 	screen.SetStyle(StyleReset)
 	screen.Clear()
 	defer screen.Fini()
