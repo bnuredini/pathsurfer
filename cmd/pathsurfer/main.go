@@ -261,14 +261,13 @@ func initModel(config *conf.Config) model {
 		slog.Info("Error whilst reading marks", "err", err)
 		m.marks = map[rune]string{}
 	}
-	m = handleDirectoryChange(m, m.currPath, config)
+	m = handleDirectoryChange(m, config)
 
 	return m
 }
 
-// TODO: Reduce parameter count.
-func handleDirectoryChange(m model, path string, config *conf.Config) model {
-	dir, err := os.ReadDir(path)
+func handleDirectoryChange(m model, config *conf.Config) model {
+	dir, err := os.ReadDir(m.currPath)
 	if err != nil {
 		if os.IsPermission(err) {
 			slog.Error("Encountered a permissions issue when updating the file listing", "err", err)
@@ -381,7 +380,7 @@ func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (
 
 	case ".":
 		config.ShowHiddenFiles = !config.ShowHiddenFiles
-		m = handleDirectoryChange(m, m.currPath, config)
+		m = handleDirectoryChange(m, config)
 
 	case "/":
 		m.currMode = ModeSearch
@@ -487,7 +486,7 @@ func handleKeyPressInDefault(m model, ev *tcell.EventKey, config *conf.Config) (
 		if m.currSearchEntry != "" {
 			m.currSearchEntry = ""
 			m.searchBarPrefix = SearchBarPrefixNavigating
-			m = handleDirectoryChange(m, m.currPath, config)
+			m = handleDirectoryChange(m, config)
 		}
 
 		m.shouldDisplayHelpSection = false
@@ -548,7 +547,7 @@ func handleKeyPressInSearch(m model, ev *tcell.EventKey, config *conf.Config) (m
 		m.currMode = ModeDefault
 
 		if strings.TrimSpace(m.currSearchEntry) == "" {
-			m = handleDirectoryChange(m, m.currPath, config)
+			m = handleDirectoryChange(m, config)
 			break
 		}
 
@@ -563,7 +562,7 @@ func handleKeyPressInSearch(m model, ev *tcell.EventKey, config *conf.Config) (m
 		m.currMode = ModeDefault
 		m.currSearchEntry = ""
 		m.searchBarPrefix = SearchBarPrefixNavigating
-		m = handleDirectoryChange(m, m.currPath, config)
+		m = handleDirectoryChange(m, config)
 
 	case tcell.KeyTAB:
 		if len(m.files) == 0 {
@@ -580,7 +579,7 @@ func handleKeyPressInSearch(m model, ev *tcell.EventKey, config *conf.Config) (m
 
 			m.positionHistory[m.currPath] = index
 			newPath := filepath.Join(m.currPath, firstMatch.Name())
-			m = handleDirectoryChange(m, newPath, config)
+			m = handleDirectoryChange(m, config)
 			m.currPath = newPath
 
 			if indexFromHistory, ok := m.positionHistory[m.currPath]; ok {
@@ -646,7 +645,7 @@ func handleKeyPressInListeningForMark(m model, ev *tcell.EventKey, config *conf.
 	defer f.Close()
 
 	m.currPath = path
-	m = handleDirectoryChange(m, m.currPath, config)
+	m = handleDirectoryChange(m, config)
 	m.selectedIdx = 0
 	m.scrollOffset = 0
 	m.currSearchEntry = ""
@@ -695,7 +694,7 @@ func handleKeyPressLeft(m model, config *conf.Config) model {
 		m.selectedIdx = indexFromHistory
 	}
 
-	m = handleDirectoryChange(m, m.currPath, config)
+	m = handleDirectoryChange(m, config)
 
 	return m
 }
@@ -708,7 +707,7 @@ func handleKeyPressRight(m model, config *conf.Config) model {
 		m.positionHistory[m.currPath] = m.selectedIdx
 
 		m.currPath = filepath.Join(m.currPath, m.files[m.selectedIdx].Name())
-		m = handleDirectoryChange(m, m.currPath, config)
+		m = handleDirectoryChange(m, config)
 
 		if indexFromHistory, ok := m.positionHistory[m.currPath]; ok {
 			m.selectedIdx = indexFromHistory
@@ -773,6 +772,7 @@ func render(m model, config *conf.Config) {
 		drawStatusLine(screen, m.globalErr.Error(), StyleError)
 	}
 
+	screen.SetTitle(fmt.Sprintf("pathsurfer - %v", m.currPath))
 	screen.Show()
 }
 
