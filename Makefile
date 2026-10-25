@@ -84,7 +84,7 @@ integrate/zsh:
 .PHONY: uninstall
 uninstall:
 	@echo "Removing $(install_path)..."
-	rm -f $(install_path)
+	rm -rf $(install_path)
 	@echo "Uninstallation completed"
 
 ## disintegrate/fish: remove fish integration
