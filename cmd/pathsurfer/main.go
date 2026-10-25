@@ -816,14 +816,6 @@ func drawFileList(m model, screen tcell.Screen, config *conf.Config) {
 		y2: h - 1,
 	}
 
-	sep1X := leftPaneDimensions.x2 + 1
-	sep2X := mainPaneDimensions.x2 + 1
-
-	for i := range h - 1 {
-		screen.SetContent(sep1X, i+1, '|', nil, tcell.StyleDefault)
-		screen.SetContent(sep2X, i+1, '|', nil, tcell.StyleDefault)
-	}
-
 	{
 		dimensions := v4{x1: 0, y1: 0, x2: w, y2: 0}
 		text := fmt.Sprintf("%s/%s", m.currPath, m.currSearchEntry)
