@@ -82,6 +82,7 @@ var (
 	StyleInfo                = tcell.StyleDefault.Foreground(color.Yellow)
 	StyleAttention           = tcell.StyleDefault.Background(color.SteelBlue).Foreground(color.White)
 	StyleSelectedEntry       = tcell.StyleDefault.Background(color.DarkBlue).Foreground(color.White)
+	StyleDirEntry            = tcell.StyleDefault.Foreground(color.Green)
 )
 
 var RunesThatTriggerRedrawInDefault = []rune{
@@ -795,34 +796,13 @@ func drawFileList(m model, screen tcell.Screen, config *conf.Config) {
 	screen.Clear()
 
 	w, h := screen.Size()
-	secondaryPaneWidth := w / 6
-
-	leftPaneDimensions := v4{
-		x1: 0,
-		y1: 1,
-		x2: secondaryPaneWidth,
-		y2: h - 1,
-	}
-	mainPaneDimensions := v4{
-		x1: leftPaneDimensions.x2 + 2,
-		y1: 1,
-		x2: leftPaneDimensions.x2 + (3 * secondaryPaneWidth),
-		y2: h - 1,
-	}
-	rightPaneDimensions := v4{
-		x1: mainPaneDimensions.x2 + 2,
-		y1: 1,
-		x2: mainPaneDimensions.x2 + (2 * secondaryPaneWidth),
-		y2: h - 1,
-	}
-
 	{
 		dimensions := v4{x1: 0, y1: 0, x2: w, y2: 0}
 		text := fmt.Sprintf("%s/%s", m.currPath, m.currSearchEntry)
 		if m.searchBarPrefix != "" {
 			text = fmt.Sprintf("%s: %s", m.searchBarPrefix, text)
 		}
-		
+
 		switch m.currMode {
 		case ModeSearch:
 			drawText(screen, dimensions, StyleActivePathIndicator, text)
@@ -832,6 +812,27 @@ func drawFileList(m model, screen tcell.Screen, config *conf.Config) {
 			drawText(screen, dimensions, StylePathIndicator, text)
 			screen.HideCursor()
 		}
+	}
+
+	secondaryPaneWidth := w / 6
+
+	leftPaneV4 := v4{
+		x1: 0,
+		y1: 1,
+		x2: secondaryPaneWidth,
+		y2: h - 1,
+	}
+	mainPaneV4 := v4{
+		x1: leftPaneV4.x2 + 2,
+		y1: 1,
+		x2: leftPaneV4.x2 + (3 * secondaryPaneWidth),
+		y2: h - 1,
+	}
+	rightPaneV4 := v4{
+		x1: mainPaneV4.x2 + 2,
+		y1: 1,
+		x2: mainPaneV4.x2 + (2 * secondaryPaneWidth),
+		y2: h - 1,
 	}
 
 	parentSelectedIdx := 0
@@ -861,36 +862,76 @@ func drawFileList(m model, screen tcell.Screen, config *conf.Config) {
 		childFiles = getDirEntries(childDir, config)
 	}
 
-	drawPane(screen, parentFiles, leftPaneDimensions, parentSelectedIdx, m.parentScrollOffset)
-	drawPane(screen, m.files, mainPaneDimensions, m.selectedIdx, m.scrollOffset)
-	drawPane(screen, childFiles, rightPaneDimensions, 0, 0)
+	drawPane(
+		screen,
+		pane{
+			entries:        parentFiles,
+			dimensions:     leftPaneV4,
+			selectedMarker: parentSelectedIdx,
+			scrollMarker:   m.parentScrollOffset,
+			isActive:       false,
+		},
+	)
+	drawPane(
+		screen,
+		pane{
+			entries:        m.files,
+			dimensions:     mainPaneV4,
+			selectedMarker: m.selectedIdx,
+			scrollMarker:   m.scrollOffset,
+			isActive:       true,
+		},
+	)
+	drawPane(
+		screen,
+		pane{
+			entries:        childFiles,
+			dimensions:     rightPaneV4,
+			selectedMarker: 0,
+			scrollMarker:   0,
+			isActive:       false,
+		},
+	)
 }
 
-func drawPane(screen tcell.Screen, entries []fs.DirEntry, dimensions v4, selectedMarker int, scrollMarker int) {
-	heightUsableForFiles := dimensions.y2 - dimensions.y1
+type pane struct {
+	entries        []fs.DirEntry
+	dimensions     v4
+	selectedMarker int
+	scrollMarker   int
+	isActive       bool
+}
+
+func drawPane(screen tcell.Screen, p pane) {
+	heightUsableForFiles := p.dimensions.y2 - p.dimensions.y1
 
 	for i := range heightUsableForFiles {
-		fileIdx := scrollMarker + i
-		if fileIdx >= len(entries) {
+		fileIdx := p.scrollMarker + i
+		if fileIdx >= len(p.entries) {
 			break
 		}
 
 		prefix := "  "
-		style := tcell.StyleDefault
-		file := entries[fileIdx]
+		file := p.entries[fileIdx]
+		calculatedStyle := tcell.StyleDefault
 
 		if file.IsDir() {
 			prefix = "📁 "
-			style = style.Foreground(color.Green)
+			calculatedStyle = StyleDirEntry
 		}
-		if fileIdx == selectedMarker {
-			style = StyleSelectedEntry
+
+		if fileIdx == p.selectedMarker {
+			calculatedStyle = StyleSelectedEntry
+		}
+
+		if !p.isActive {
+			calculatedStyle = calculatedStyle.Dim(true)
 		}
 
 		drawText(
 			screen,
-			v4{x1: dimensions.x1, y1: dimensions.y1 + i, x2: dimensions.x2, y2: dimensions.y1 + i},
-			style,
+			v4{x1: p.dimensions.x1, y1: p.dimensions.y1 + i, x2: p.dimensions.x2, y2: p.dimensions.y1 + i},
+			calculatedStyle,
 			fmt.Sprintf("%s%s", prefix, file.Name()),
 		)
 	}
@@ -957,6 +998,16 @@ func drawText(screen tcell.Screen, dimensions v4, style tcell.Style, text string
 		if currRow > dimensions.y2 {
 			break
 		}
+	}
+	
+	for currCol < dimensions.x2 {
+		screen.SetContent(currCol, currRow, ' ', nil, style)
+		currCol++
+	}
+	
+	for currCol < dimensions.x2 {
+		screen.SetContent(currCol, currRow, ' ', nil, style)
+		currCol++
 	}
 }
 
