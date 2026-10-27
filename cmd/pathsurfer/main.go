@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"errors"
-	"unicode/utf8"
 	"fmt"
 	"io/fs"
 	"log"
@@ -14,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"syscall"
+	"unicode/utf8"
 
 	"github.com/gdamore/tcell/v3"
 	"github.com/gdamore/tcell/v3/color"
@@ -21,6 +21,7 @@ import (
 	"github.com/bnuredini/pathsurfer/internal/conf"
 	"github.com/bnuredini/pathsurfer/internal/fuzzy"
 	"github.com/bnuredini/pathsurfer/internal/stringutil"
+	"github.com/bnuredini/pathsurfer/internal/wizard"
 )
 
 type v4 struct {
@@ -75,7 +76,7 @@ type model struct {
 }
 
 var (
-	StylePathIndicator       = tcell.StyleDefault.Foreground(color.Gray)
+	StylePathIndicator       = tcell.StyleDefault.Foreground(color.White)
 	StyleActivePathIndicator = tcell.StyleDefault.Foreground(color.Blue)
 	StyleReset               = tcell.StyleDefault.Background(color.Reset).Foreground(color.Reset)
 	StyleError               = tcell.StyleDefault.Foreground(color.White).Background(color.DarkRed)
@@ -118,6 +119,11 @@ var ChainableKeybindings = map[string][]keybinding{
 }
 
 func main() {
+	if err := handleSubcommands(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
 	config, err := conf.Init()
 	if err != nil {
 		log.Fatalf("Failed to boot up: %v", err)
@@ -239,7 +245,6 @@ func main() {
 
 func initModel(config *conf.Config) model {
 	m := model{}
-
 	m.positionHistory = make(map[string]int)
 
 	if strings.TrimSpace(conf.InitialPath) == "" {
@@ -1235,4 +1240,28 @@ func readMarks(config *conf.Config) (map[rune]string, error) {
 	err = scanner.Err()
 
 	return result, err
+}
+
+func handleSubcommands() error {
+	if len(os.Args[1:]) <= 0 {
+		return nil
+	}
+
+	arg := strings.TrimSpace(os.Args[1])
+	if arg == "wizard" {
+		return wizard.Start()
+	}
+
+	pathDirInfo, err := os.Stat(arg)
+	if os.IsNotExist(err) {
+		log.Fatalf("%q does not exist", arg)
+	} else if err != nil {
+		log.Fatalf("%q is not a valid path: %v", arg, err)
+	} else if !pathDirInfo.IsDir() {
+		log.Fatalf("%q is not a valid directory", arg)
+	}
+
+	conf.InitialPath = arg
+
+	return nil
 }

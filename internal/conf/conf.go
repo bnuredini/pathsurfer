@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 )
 
 var (
@@ -53,21 +52,6 @@ func init() {
 		ProgramName,
 		fmt.Sprintf("%s.mark", ProgramName),
 	)
-
-	if len(flag.Args()) > 0 {
-		pathArg := strings.TrimSpace(flag.Args()[0])
-
-		pathDirInfo, err := os.Stat(pathArg)
-		if os.IsNotExist(err) {
-			log.Fatalf("%q does not exist", pathArg)
-		} else if err != nil {
-			log.Fatalf("%q is not a valid path: %v", pathArg, err)
-		} else if !pathDirInfo.IsDir() {
-			log.Fatalf("%q is not a valid directory", pathArg)
-		}
-
-		InitialPath = pathArg
-	}
 }
 
 func Init() (*Config, error) {

@@ -1,3 +1,7 @@
+# TODO: Consider removing the install, uninstall, & disintegration commands.
+# But, in the mean time, try to keep these commands up-to-date with what's in
+# the wizard until they're removed.
+	
 binary_name       = pathsurfer
 binary_path       = ./build/${binary_name}
 main_package_path = ./cmd/pathsurfer

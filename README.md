@@ -45,6 +45,29 @@ Here's a set of features this program doesn't include on purpose:
 * Rendering images
 * Configuration via scripting
 
+## Installing
+
+Linux:
+
+```bash
+curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-linux-amd64.tar.gz | tar xz
+./pathsurfer-linux-amd64.tar.gz wizard
+```
+
+macOS:
+
+```bash
+curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-darwin-arm64.tar.gz | tar xz
+./pathsurfer-darwin-arm64.tar.gz wizard
+```
+
+Windows:
+
+```bash
+curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsurfer-windows-amd64-.tar.gz | tar xz
+./pathsurfer-windows-amd64.tar.gz wizard
+```
+
 ## Keybindings
 
 ### Default mode
