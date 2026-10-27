@@ -578,16 +578,11 @@ func handleKeyPressInSearch(m model, ev *tcell.EventKey, config *conf.Config) (m
 				break
 			}
 
+			m.selectedIdx = index
 			m.positionHistory[m.currPath] = index
 			newPath := filepath.Join(m.currPath, firstMatch.Name())
-			m = handleDirectoryChange(m, config)
 			m.currPath = newPath
-
-			if indexFromHistory, ok := m.positionHistory[m.currPath]; ok {
-				m.selectedIdx = indexFromHistory
-			} else {
-				m.selectedIdx = 0
-			}
+			m = handleDirectoryChange(m, config)
 		}
 
 		m.searchBarPrefix = SearchBarPrefixSearching
@@ -1004,12 +999,12 @@ func drawText(screen tcell.Screen, dimensions v4, style tcell.Style, text string
 			break
 		}
 	}
-	
+
 	for currCol < dimensions.x2 {
 		screen.SetContent(currCol, currRow, ' ', nil, style)
 		currCol++
 	}
-	
+
 	for currCol < dimensions.x2 {
 		screen.SetContent(currCol, currRow, ' ', nil, style)
 		currCol++
