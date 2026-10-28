@@ -914,7 +914,7 @@ func handleSubcommands() error {
 
 	arg := strings.TrimSpace(os.Args[1])
 	switch arg {
-	case "wizard":
+	case "+wizard":
 		return wizard.Start()
 	default:
 		return nil
