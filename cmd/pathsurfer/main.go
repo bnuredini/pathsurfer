@@ -235,7 +235,10 @@ func initModel(config *conf.Config) model {
 	m := model{}
 	m.positionHistory = make(map[string]int)
 
-	if strings.TrimSpace(conf.InitialPath) == "" {
+	pathProvided := len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "+") 
+	if pathProvided {
+		m.currPath = os.Args[1]
+	} else {
 		var err error
 		m.currPath, err = os.Getwd()
 		if err != nil {
@@ -928,8 +931,6 @@ func handleSubcommands() error {
 	} else if !pathDirInfo.IsDir() {
 		log.Fatalf("%q is not a valid directory", arg)
 	}
-
-	conf.InitialPath = arg
 
 	return nil
 }
