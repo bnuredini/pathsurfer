@@ -913,8 +913,11 @@ func handleSubcommands() error {
 	}
 
 	arg := strings.TrimSpace(os.Args[1])
-	if arg == "wizard" {
+	switch arg {
+	case "wizard":
 		return wizard.Start()
+	default:
+		return nil
 	}
 
 	pathDirInfo, err := os.Stat(arg)
