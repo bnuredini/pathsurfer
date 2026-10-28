@@ -102,13 +102,17 @@ curl -sL https://github.com/bnuredini/pathsurfer/releases/latest/download/pathsu
 Building and integrating pathsurfer is easy: using Make, you'll just need to run one command to
 build the binary and one command to integrate with your shell.
 
+To build, run:
+
+```
+make build
+```
+
 To build and install, run:
 
 ```bash
 make install
 ```
-
-(If you just need to build the binary, run `make build`.)
 
 Depending on which shell you use, run one of the following to integrate pathsurfer with your shell:
 
