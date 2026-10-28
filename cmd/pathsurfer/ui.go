@@ -9,8 +9,20 @@ import (
 	"io/fs"
 	
 	"github.com/gdamore/tcell/v3"
+	"github.com/gdamore/tcell/v3/color"
 
 	"github.com/bnuredini/pathsurfer/internal/conf"
+)
+
+var (
+	StylePathIndicator       = tcell.StyleDefault.Foreground(color.White)
+	StyleActivePathIndicator = tcell.StyleDefault.Foreground(color.Blue)
+	StyleReset               = tcell.StyleDefault.Background(color.Reset).Foreground(color.Reset)
+	StyleError               = tcell.StyleDefault.Foreground(color.White).Background(color.DarkRed)
+	StyleInfo                = tcell.StyleDefault.Foreground(color.Yellow)
+	StyleAttention           = tcell.StyleDefault.Background(color.SteelBlue).Foreground(color.White)
+	StyleSelectedEntry       = tcell.StyleDefault.Background(color.DarkBlue).Foreground(color.White)
+	StyleDirEntry            = tcell.StyleDefault.Foreground(color.Green)
 )
 
 func render(m model, config *conf.Config) {
@@ -140,6 +152,7 @@ func drawMainPane(m model, screen tcell.Screen) {
 			selectedMarker: m.selectedIdx,
 			scrollMarker:   m.scrollOffset,
 			isActive:       true,
+			displayMessageIfEmpty: true,
 		},
 	)
 }
@@ -177,9 +190,21 @@ type pane struct {
 	selectedMarker int
 	scrollMarker   int
 	isActive       bool
+	displayMessageIfEmpty bool
 }
 
 func drawPane(screen tcell.Screen, p pane) {
+	if len(p.entries) == 0 && p.displayMessageIfEmpty {
+		drawText(
+			screen,
+			v4{x1: p.dimensions.x1, y1: p.dimensions.y1, x2: p.dimensions.x2, y2: p.dimensions.y1},
+			StyleInfo,
+			"No entries",
+		)
+		
+		return
+	}
+	
 	heightUsableForFiles := p.dimensions.y2 - p.dimensions.y1
 
 	for i := range heightUsableForFiles {
