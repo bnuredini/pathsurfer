@@ -19,7 +19,6 @@ const DefaultBigJumpLength = 22
 
 var DefaultLogFilePath string
 var DefaultMarkFilePath string
-var InitialPath string
 
 const (
 	ProgramName = "pathsurfer"
@@ -57,13 +56,19 @@ func init() {
 func Init() (*Config, error) {
 	flag.Usage = func() {
 		cliOutput := flag.CommandLine.Output()
+	
+		fmt.Fprintln(cliOutput, `psurf - a tiny terminal utility for fast directory navigating
 
-		fmt.Fprintln(cliOutput, "psurf - a tiny terminal utility for fast directory navigating")
-		fmt.Fprintln(cliOutput, "")
-		fmt.Fprintln(cliOutput, "Usage:")
-		fmt.Fprintln(cliOutput, "  psurf [options] [path]")
-		fmt.Fprintln(cliOutput, "")
-		fmt.Fprintln(cliOutput, "Options:")
+Usage: psurf [subcommand] [options]... [path]
+
+Arguments:
+  [subcommand] Used for calling auxilirary actions. If this is left out, Pathsurfer will start normally.
+  [path]       Assuming no subcommand has been provided, Pathsurfer will change-directory into this path.
+  
+Subcommands:
+  +wizard      A convenient setup helper for integrating pathsurfer into your system
+
+Options:`)
 		flag.PrintDefaults()
 	}
 
