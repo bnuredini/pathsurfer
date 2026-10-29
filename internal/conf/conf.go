@@ -63,7 +63,7 @@ Usage: psurf [subcommand] [options]... [path]
 
 Arguments:
   [subcommand] Used for calling auxilirary actions. If this is left out, Pathsurfer will start normally.
-  [path]       Assuming no subcommand has been provided, Pathsurfer will change-directory into this path.
+  [path]       Assuming no subcommand has been provided, Pathsurfer will start in this path.
   
 Subcommands:
   +wizard      A convenient setup helper for integrating pathsurfer into your system
