@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"runtime/debug"
+	"flag"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -147,7 +149,7 @@ func main() {
 
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Error("Application panicked", "panic", r)
+			slog.Error("Application panicked", "panic", r, "stack", string(debug.Stack()))
 		}
 
 		if logFile != nil {
@@ -171,6 +173,8 @@ func main() {
 		}
 		os.Exit(0)
 	}()
+	
+	m := initModel(config)
 
 	screen, err = tcell.NewScreen()
 	if err != nil {
@@ -187,9 +191,9 @@ func main() {
 	screen.Clear()
 	defer screen.Fini()
 
-	pathToPrint := ""
-	m := initModel(config)
+	m = handleDirectoryChange(m, config)
 	render(m, config)
+	pathToPrint := ""
 
 	running := true
 	for running {
@@ -234,10 +238,11 @@ func main() {
 func initModel(config *conf.Config) model {
 	m := model{}
 	m.positionHistory = make(map[string]int)
-
-	pathProvided := len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "+") 
+	args := flag.Args()
+	pathProvided := len(args) > 0 && !strings.HasPrefix(args[0], "+") 
+	
 	if pathProvided {
-		m.currPath = os.Args[1]
+		m.currPath = args[0]
 	} else {
 		var err error
 		m.currPath, err = os.Getwd()
@@ -254,7 +259,6 @@ func initModel(config *conf.Config) model {
 		slog.Info("Error whilst reading marks", "err", err)
 		m.marks = map[rune]string{}
 	}
-	m = handleDirectoryChange(m, config)
 
 	return m
 }
