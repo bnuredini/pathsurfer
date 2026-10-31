@@ -56,7 +56,7 @@ func init() {
 func Init() (*Config, error) {
 	flag.Usage = func() {
 		cliOutput := flag.CommandLine.Output()
-	
+
 		fmt.Fprintln(cliOutput, `psurf - a tiny terminal utility for fast directory navigating
 
 Usage: psurf [subcommand] [options]... [path]
@@ -118,9 +118,7 @@ Options:`)
 	flag.Parse()
 
 	if *displayVersion {
-		out := flag.CommandLine.Output()
-		fmt.Fprintf(out, "version:\t%s\n", version)
-		fmt.Fprintf(out, "build time:\t%s\n", buildTime)
+		PrintVersion()
 		os.Exit(0)
 	}
 
@@ -140,7 +138,7 @@ Options:`)
 	} else if !markDirInfo.IsDir() {
 		log.Fatalf("Cannot store marks in %q because %q is not a directory", result.MarkFilePath, markDir)
 	}
-	
+
 	return result, nil
 }
 
@@ -165,4 +163,9 @@ func printConfig(c Config) error {
 	log.Printf("config: %v", string(b))
 
 	return nil
+}
+
+func PrintVersion() {
+	fmt.Printf("version:\t%s\n", version)
+	fmt.Printf("build time:\t%s\n", buildTime)
 }

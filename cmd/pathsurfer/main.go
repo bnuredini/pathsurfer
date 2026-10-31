@@ -923,6 +923,9 @@ func handleSubcommands() error {
 	switch arg {
 	case "+wizard":
 		return wizard.Start()
+	case "+version":
+		conf.PrintVersion()
+		os.Exit(0)
 	default:
 		return nil
 	}
