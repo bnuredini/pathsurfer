@@ -327,7 +327,8 @@ func updateFileListingWithSearch(m model, files []fs.DirEntry, config *conf.Conf
 
 func handleKeyPress(m model, ev *tcell.EventKey, config *conf.Config) (model, error) {
 	if ev.Key() == tcell.KeyCtrlC {
-		return m, nil
+		screen.Fini()
+		os.Exit(0)
 	}
 
 	var err error
