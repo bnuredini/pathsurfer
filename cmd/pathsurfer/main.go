@@ -566,17 +566,17 @@ func handleKeyPressInSearch(m model, ev *tcell.EventKey, config *conf.Config) (m
 			break
 		}
 
-		firstMatch := m.files[0]
-		if firstMatch.IsDir() {
-			index, indexFound := getEntryIndexFromPath(m, m.currPath, firstMatch.Name(), config)
+		dirToEnter := m.files[m.selectedIdx]
+		if dirToEnter.IsDir() {
+			index, indexFound := getEntryIndexFromPath(m, m.currPath, dirToEnter.Name(), config)
 			if !indexFound {
 				// TODO: Log error in screen.
 				break
 			}
 
-			m.selectedIdx = index
+			m.selectedIdx = 0
 			m.positionHistory[m.currPath] = index
-			newPath := filepath.Join(m.currPath, firstMatch.Name())
+			newPath := filepath.Join(m.currPath, dirToEnter.Name())
 			m.currPath = newPath
 			m = handleDirectoryChange(m, config)
 		}
