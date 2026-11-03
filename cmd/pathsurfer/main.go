@@ -665,14 +665,14 @@ func handleKeyPressLeft(m model, config *conf.Config) model {
 	newPath := filepath.Dir(m.currPath)
 	m.currPath = newPath
 	m.currSearchEntry = ""
+	
+	m = handleDirectoryChange(m, config)
 
 	for i, f := range m.files {
 		if f.Name() == filepath.Base(oldPath) {
 			m.selectedIdx = i
 		}
 	}
-
-	m = handleDirectoryChange(m, config)
 
 	return m
 }
