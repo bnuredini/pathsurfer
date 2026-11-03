@@ -76,22 +76,6 @@ type model struct {
 	shouldQuit                bool
 }
 
-var RunesThatTriggerRedrawInDefault = []rune{
-	'h',
-	'j',
-	'k',
-	'l',
-	'.',
-	'\'',
-}
-
-var KeysThatTriggerRedrawInDefault = []tcell.Key{
-	tcell.KeyBackspace,
-	tcell.KeyCR,
-	tcell.KeyTAB,
-	tcell.KeyESC,
-}
-
 type keybinding struct {
 	key         string
 	description string
@@ -574,6 +558,7 @@ func handleKeyPressInSearch(m model, ev *tcell.EventKey, config *conf.Config) (m
 				break
 			}
 
+			// TODO: Keep a separate currently-selected index for search so you can .
 			m.selectedIdx = 0
 			m.positionHistory[m.currPath] = index
 			newPath := filepath.Join(m.currPath, dirToEnter.Name())
@@ -681,15 +666,10 @@ func handleKeyPressLeft(m model, config *conf.Config) model {
 	m.currPath = newPath
 	m.currSearchEntry = ""
 
-	indexFromHistory, ok := m.positionHistory[newPath]
-	if !ok {
-		for i, f := range m.files {
-			if f.Name() == filepath.Base(oldPath) {
-				m.selectedIdx = i
-			}
+	for i, f := range m.files {
+		if f.Name() == filepath.Base(oldPath) {
+			m.selectedIdx = i
 		}
-	} else {
-		m.selectedIdx = indexFromHistory
 	}
 
 	m = handleDirectoryChange(m, config)
