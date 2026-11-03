@@ -87,7 +87,7 @@ func darwinWizard() error {
 		fmt.Printf("Failed to create %q: %v", fishConfigDirPath, err)
 	}
 	
-	fishFunctionFile, err := os.OpenFile(fishFunctionPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	fishFunctionFile, err := os.OpenFile(fishFunctionPath, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		fmt.Printf("Failed to open %q: %v\n", fishFunctionPath, err)
 	}
@@ -117,7 +117,7 @@ func darwinWizard() error {
 	}
 	defer shFunctionFromFS.Close()
 	
-	shFunctionFile, err := os.OpenFile(bashOrZshFunctionPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	shFunctionFile, err := os.OpenFile(bashOrZshFunctionPath, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		fmt.Printf("Failed to open %q: %v\n", bashOrZshFunctionPath, err)
 	}
