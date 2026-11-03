@@ -586,6 +586,12 @@ func handleKeyPressInSearch(m model, ev *tcell.EventKey, config *conf.Config) (m
 
 	case tcell.KeyBacktab:
 		m = handleKeyPressLeft(m, config)
+		
+	case tcell.KeyUp:
+		m = handleKeyPressUp(m)
+
+	case tcell.KeyDown:
+		m = handleKeyPressDown(m)
 	}
 
 	return m, nil
